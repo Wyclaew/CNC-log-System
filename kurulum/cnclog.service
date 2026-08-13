@@ -1,0 +1,50 @@
+# CNC Log System - systemd kullanici servisi
+#
+# Programi arka planda surekli calistirir; bilgisayar acildiginda kendiliginden
+# baslar ve cokerse yeniden baslatilir. Arayuz yine http://127.0.0.1:8760
+# adresinden acilir.
+#
+# KURULUM (root gerekmez):
+#     mkdir -p ~/.config/systemd/user
+#     cp kurulum/cnclog.service ~/.config/systemd/user/
+#     # Asagidaki WorkingDirectory/ExecStart yollarini kendi klasorunuze gore
+#     # duzenleyin, sonra:
+#     systemctl --user daemon-reload
+#     systemctl --user enable --now cnclog
+#
+# DURUM / LOG:
+#     systemctl --user status cnclog
+#     journalctl --user -u cnclog -f
+#
+# OTURUM KAPANINCA DA CALISSIN (tezgah basinda kimse login degilken):
+#     sudo loginctl enable-linger $USER
+#
+# NOT: systemd olmayan sistemlerde bu dosya ise yaramaz; o durumda programi
+# ./baslat.sh ile elle baslatin veya XFCE'nin "Oturum ve Baslangic"
+# ayarlarindan otomatik baslatmaya ekleyin.
+
+[Unit]
+Description=CNC Log System - tezgah veri kaydi
+Documentation=file:%h/cnclog/KURULUM.md
+After=network-online.target
+
+[Service]
+Type=simple
+
+# BURAYI KENDI KLASORUNUZE GORE DEGISTIRIN:
+WorkingDirectory=%h/cnclog
+ExecStart=%h/cnclog/baslat.sh --tarayici-yok
+
+# Cokerse yeniden baslat. Vardiya ortasinda kayit kesilmesin.
+Restart=always
+RestartSec=10
+
+# SIGTERM ile duzgun kapanmasi icin sure ver: acik kayitlar kapatiliyor.
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CNC Log
+Name[tr]=CNC Log
+GenericName=Machine Data Logger
+GenericName[tr]=Tezgah Veri Kaydı
+Comment=Records CNC machine data and shows the log
+Comment[tr]=Tezgah verilerini kaydeder ve logu gösterir
+# BURAYI DEGISTIRIN: baslat.sh dosyasinin tam yolu.
+# Otomatik ayarlamak icin:  sh kurulum/menuye-ekle.sh
+Exec=/home/KULLANICI/cnclog/baslat.sh
+Path=/home/KULLANICI/cnclog
+Icon=utilities-system-monitor
+Terminal=false
+Categories=Utility;Monitor;Engineering;
+Keywords=cnc;tezgah;log;heidenhain;tnc;
+StartupNotify=true

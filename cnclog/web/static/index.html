@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CNC Log System</title>
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+
+<header class="ustbar">
+  <div class="makine">
+    <h1 id="makineAdi">CNC Log System</h1>
+    <div class="altbilgi">
+      <span id="makineId">—</span>
+      <span class="ayrac">·</span>
+      <span id="surucuAdi">—</span>
+      <span class="ayrac">·</span>
+      <span id="depolama">—</span>
+    </div>
+  </div>
+  <div class="baglanti" id="baglantiRozet">
+    <span class="nokta"></span>
+    <span id="baglantiYazi">bağlanıyor…</span>
+  </div>
+</header>
+
+<nav class="sekmeler" role="tablist">
+  <button class="sekme aktif" data-sekme="ana" role="tab" aria-selected="true">Ana Sayfa</button>
+  <button class="sekme" data-sekme="rapor" role="tab" aria-selected="false">Rapor</button>
+</nav>
+
+<!-- ------------------------------------------------------------------ ANA -->
+<main id="sekme-ana" class="sayfa">
+
+  <section class="durumSeridi">
+    <div class="durumKart" id="durumKart">
+      <div class="durumEtiket" id="durumEtiket">—</div>
+      <div class="durumSure" id="durumSure">—</div>
+      <div class="durumNot" id="durumNot"></div>
+    </div>
+
+    <div class="kartlar">
+      <div class="kart">
+        <div class="kartBaslik">Bugün çalışma</div>
+        <div class="kartDeger" id="mCalisma">—</div>
+      </div>
+      <div class="kart">
+        <div class="kartBaslik">Bugün duruş</div>
+        <div class="kartDeger" id="mDurus">—</div>
+      </div>
+      <div class="kart">
+        <div class="kartBaslik">Kullanılabilirlik</div>
+        <div class="kartDeger" id="mKullanim">—</div>
+      </div>
+      <div class="kart">
+        <div class="kartBaslik">Duruş sayısı</div>
+        <div class="kartDeger" id="mDurusAdet">—</div>
+      </div>
+      <div class="kart">
+        <div class="kartBaslik">Alarm sayısı</div>
+        <div class="kartDeger" id="mAlarmAdet">—</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="olcumler" aria-label="Anlık değerler">
+    <div class="olcum">
+      <span class="olcumAd">İlerleme (F)</span>
+      <span class="olcumDeger" id="oFeed">—</span>
+      <span class="olcumBirim">mm/dk</span>
+    </div>
+    <div class="olcum">
+      <span class="olcumAd">Devir (S)</span>
+      <span class="olcumDeger" id="oSpindle">—</span>
+      <span class="olcumBirim">dev/dk</span>
+    </div>
+    <div class="olcum">
+      <span class="olcumAd">F override</span>
+      <span class="olcumDeger" id="oFeedOv">—</span>
+      <span class="olcumBirim">%</span>
+    </div>
+    <div class="olcum">
+      <span class="olcumAd">S override</span>
+      <span class="olcumDeger" id="oSpindleOv">—</span>
+      <span class="olcumBirim">%</span>
+    </div>
+    <div class="olcum">
+      <span class="olcumAd">Hızlı (G0)</span>
+      <span class="olcumDeger" id="oRapid">—</span>
+      <span class="olcumBirim"></span>
+    </div>
+    <div class="olcum">
+      <span class="olcumAd">Program</span>
+      <span class="olcumDeger metin" id="oProgram">—</span>
+    </div>
+    <div class="olcum">
+      <span class="olcumAd">Blok</span>
+      <span class="olcumDeger" id="oBlok">—</span>
+    </div>
+    <div class="olcum">
+      <span class="olcumAd">Takım</span>
+      <span class="olcumDeger" id="oTakim">—</span>
+    </div>
+  </section>
+
+  <section class="alarmKutu gizli" id="alarmKutu" role="alert">
+    <div class="alarmBaslik">Aktif alarm</div>
+    <ul id="alarmListe"></ul>
+  </section>
+
+  <section class="logBolum">
+    <div class="logUst">
+      <h2>Kayıtlar</h2>
+      <div class="filtreler">
+        <label>
+          Tarih
+          <select id="fTarih"></select>
+        </label>
+        <label>
+          Göster
+          <select id="fTur">
+            <option value="hepsi">Hepsi</option>
+            <option value="olcum">Sadece ölçümler</option>
+            <option value="durus">Sadece duruşlar</option>
+            <option value="alarm">Sadece alarmlar</option>
+            <option value="program">Sadece programlar</option>
+          </select>
+        </label>
+        <label class="onay">
+          <input type="checkbox" id="fOtomatik" checked>
+          Otomatik yenile
+        </label>
+      </div>
+    </div>
+
+    <div class="logKutu" id="logKutu">
+      <div class="bosluk">Kayıtlar yükleniyor…</div>
+    </div>
+  </section>
+</main>
+
+<!-- ---------------------------------------------------------------- RAPOR -->
+<main id="sekme-rapor" class="sayfa gizli">
+  <section class="raporUst">
+    <label>
+      Tarih
+      <select id="rTarih"></select>
+    </label>
+    <a class="dugme" id="rCsv" href="#" download>CSV indir</a>
+  </section>
+
+  <div id="raporIcerik">
+    <div class="bosluk">Rapor yükleniyor…</div>
+  </div>
+</main>
+
+<footer class="altbar">
+  <span id="altDurum">—</span>
+  <span class="ayrac">·</span>
+  <span>Veriler yalnızca bu bilgisayarda saklanır</span>
+  <span class="ayrac">·</span>
+  <span id="altSurum">—</span>
+</footer>
+
+<script src="/app.js"></script>
+</body>
+</html>

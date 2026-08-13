@@ -1,0 +1,448 @@
+/* Shop-floor screen: dark, high contrast, large type, readable from a step
+   back. No web fonts and no external assets -- the machine PC may have no
+   internet at all. State is never signalled by colour alone; every coloured
+   element carries its label in text too. */
+
+:root {
+  --zemin:        #0e1419;
+  --zemin-2:      #161d25;
+  --kart:         #1b242e;
+  --kenar:        #2b3745;
+  --metin:        #e6ecf2;
+  --metin-2:      #93a1b0;
+  --metin-3:      #64717f;
+
+  --calisiyor:    #2ecc71;
+  --durus:        #f0a020;
+  --alarm:        #ef4444;
+  --kurulum:      #4a9eff;
+  --kopuk:        #7a8794;
+
+  --mono: ui-monospace, "SF Mono", "DejaVu Sans Mono", "Liberation Mono",
+          Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+          "Noto Sans", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--zemin);
+  color: var(--metin);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.gizli { display: none !important; }
+
+/* ------------------------------------------------------------------ header */
+
+.ustbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 20px;
+  background: var(--zemin-2);
+  border-bottom: 1px solid var(--kenar);
+  flex-wrap: wrap;
+}
+
+.ustbar h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.altbilgi {
+  color: var(--metin-2);
+  font-size: 0.85rem;
+  margin-top: 2px;
+}
+
+.ayrac { color: var(--metin-3); margin: 0 6px; }
+
+.baglanti {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: var(--metin-2);
+  padding: 6px 12px;
+  border: 1px solid var(--kenar);
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.baglanti .nokta {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: var(--kopuk);
+  flex-shrink: 0;
+}
+
+.baglanti.acik .nokta { background: var(--calisiyor); }
+.baglanti.acik { color: var(--metin); }
+.baglanti.kopuk .nokta { background: var(--alarm); }
+.baglanti.kopuk { color: var(--alarm); border-color: var(--alarm); }
+
+/* -------------------------------------------------------------------- tabs */
+
+.sekmeler {
+  display: flex;
+  gap: 2px;
+  padding: 0 20px;
+  background: var(--zemin-2);
+  border-bottom: 1px solid var(--kenar);
+}
+
+.sekme {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--metin-2);
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 12px 18px;
+  cursor: pointer;
+}
+
+.sekme:hover { color: var(--metin); }
+.sekme.aktif { color: var(--metin); border-bottom-color: var(--kurulum); }
+.sekme:focus-visible { outline: 2px solid var(--kurulum); outline-offset: -2px; }
+
+.sayfa { padding: 20px; max-width: 1500px; margin: 0 auto; }
+
+/* ------------------------------------------------------------- state strip */
+
+.durumSeridi {
+  display: grid;
+  grid-template-columns: minmax(240px, 310px) 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.durumKart {
+  background: var(--kart);
+  border: 2px solid var(--kenar);
+  border-left: 8px solid var(--kopuk);
+  border-radius: 10px;
+  padding: 18px 22px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.durumEtiket {
+  font-size: 2.6rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+
+.durumSure {
+  font-size: 1.1rem;
+  color: var(--metin-2);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.durumNot {
+  font-size: 0.85rem;
+  color: var(--metin-3);
+  margin-top: 6px;
+}
+
+.durumKart.s-CALISIYOR    { border-left-color: var(--calisiyor); }
+.durumKart.s-CALISIYOR .durumEtiket { color: var(--calisiyor); }
+.durumKart.s-DURUS        { border-left-color: var(--durus); }
+.durumKart.s-DURUS .durumEtiket { color: var(--durus); }
+.durumKart.s-ALARM        { border-left-color: var(--alarm); }
+.durumKart.s-ALARM .durumEtiket { color: var(--alarm); }
+.durumKart.s-KURULUM      { border-left-color: var(--kurulum); }
+.durumKart.s-KURULUM .durumEtiket { color: var(--kurulum); }
+.durumKart.s-BAGLANTI_YOK { border-left-color: var(--kopuk); }
+.durumKart.s-BAGLANTI_YOK .durumEtiket { color: var(--kopuk); }
+
+.kartlar {
+  display: grid;
+  /* Wide enough for the longest duration string ("34dk 39sn") on one line --
+     wrapping it made the card read as two separate numbers -- but narrow
+     enough that all five metrics still fit on one row at 1280px. */
+  grid-template-columns: repeat(auto-fit, minmax(156px, 1fr));
+  gap: 12px;
+}
+
+.kart {
+  background: var(--kart);
+  border: 1px solid var(--kenar);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.kartBaslik {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--metin-2);
+}
+
+.kartDeger {
+  font-size: 1.6rem;
+  font-weight: 650;
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ measurements */
+
+.olcumler {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1px;
+  background: var(--kenar);
+  border: 1px solid var(--kenar);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.olcum {
+  background: var(--kart);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.olcumAd {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--metin-2);
+}
+
+.olcumDeger {
+  font-family: var(--mono);
+  font-size: 1.35rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.olcumDeger.metin { font-size: 1rem; word-break: break-all; }
+.olcumDeger.yok { color: var(--metin-3); }
+.olcumDeger.hizli { color: var(--kurulum); }
+
+.olcumBirim { font-size: 0.72rem; color: var(--metin-3); }
+
+/* ------------------------------------------------------------------ alarms */
+
+.alarmKutu {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid var(--alarm);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-bottom: 16px;
+}
+
+.alarmBaslik {
+  font-weight: 650;
+  color: var(--alarm);
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  letter-spacing: 0.06em;
+}
+
+.alarmKutu ul { margin: 8px 0 0; padding-left: 20px; }
+.alarmKutu li { margin: 3px 0; font-size: 1.05rem; }
+
+/* --------------------------------------------------------------------- log */
+
+.logUst {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.logUst h2 { margin: 0; font-size: 1.05rem; font-weight: 650; }
+
+.filtreler {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.filtreler label {
+  font-size: 0.8rem;
+  color: var(--metin-2);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.filtreler label.onay { cursor: pointer; }
+
+select, .dugme {
+  background: var(--kart);
+  color: var(--metin);
+  border: 1px solid var(--kenar);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+select:focus-visible, .dugme:focus-visible {
+  outline: 2px solid var(--kurulum);
+  outline-offset: 1px;
+}
+
+.dugme { text-decoration: none; display: inline-block; }
+.dugme:hover { border-color: var(--kurulum); }
+
+.logKutu {
+  background: var(--kart);
+  border: 1px solid var(--kenar);
+  border-radius: 10px;
+  max-height: 58vh;
+  overflow-y: auto;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 0.92rem;
+}
+
+.satir {
+  display: grid;
+  grid-template-columns: 92px 132px 1fr;
+  gap: 10px;
+  padding: 5px 14px;
+  border-bottom: 1px solid rgba(43, 55, 69, 0.5);
+  white-space: nowrap;
+}
+
+.satir:last-child { border-bottom: none; }
+.satir:hover { background: rgba(74, 158, 255, 0.06); }
+
+.sSaat {
+  color: var(--metin-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.sEtiket { font-weight: 650; }
+.sMesaj { color: var(--metin); white-space: pre-wrap; word-break: break-word; }
+
+.satir.t-alarm  .sEtiket { color: var(--alarm); }
+.satir.t-alarm  { background: rgba(239, 68, 68, 0.07); }
+.satir.t-durus  .sEtiket { color: var(--durus); }
+.satir.t-program .sEtiket { color: var(--kurulum); }
+.satir.t-sistem .sEtiket { color: var(--metin-3); }
+.satir.t-olcum  .sEtiket { color: var(--metin-2); font-weight: 500; }
+.satir.d-CALISIYOR .sEtiket { color: var(--calisiyor); }
+.satir.d-DURUS .sEtiket { color: var(--durus); }
+.satir.d-ALARM .sEtiket { color: var(--alarm); }
+.satir.d-KURULUM .sEtiket { color: var(--kurulum); }
+.satir.d-BAGLANTI_YOK .sEtiket { color: var(--kopuk); }
+
+.bosluk {
+  padding: 30px 20px;
+  text-align: center;
+  color: var(--metin-3);
+  font-family: var(--sans);
+}
+
+/* ------------------------------------------------------------------ report */
+
+.raporUst {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.raporUst label {
+  font-size: 0.85rem;
+  color: var(--metin-2);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.raporBlok {
+  background: var(--kart);
+  border: 1px solid var(--kenar);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+
+.raporBlok h3 {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--metin-2);
+  font-weight: 650;
+}
+
+.tabloSar { overflow-x: auto; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+}
+
+th, td {
+  text-align: left;
+  padding: 7px 12px 7px 0;
+  border-bottom: 1px solid rgba(43, 55, 69, 0.6);
+  white-space: nowrap;
+}
+
+th {
+  color: var(--metin-2);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+td.sayi, th.sayi {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--mono);
+}
+
+td.genis { white-space: normal; word-break: break-word; }
+
+/* ------------------------------------------------------------------ footer */
+
+.altbar {
+  padding: 12px 20px;
+  border-top: 1px solid var(--kenar);
+  background: var(--zemin-2);
+  color: var(--metin-3);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------- narrower */
+
+@media (max-width: 900px) {
+  .durumSeridi { grid-template-columns: 1fr; }
+  .durumEtiket { font-size: 2.1rem; }
+  .satir { grid-template-columns: 78px 110px 1fr; gap: 8px; font-size: 0.85rem; }
+  .sayfa { padding: 14px; }
+}
