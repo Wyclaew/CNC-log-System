@@ -9,6 +9,15 @@ duruşları ve alarmları tutan, gün/vardiya raporu çıkaran bir program.
 **Özet:** USB'yi tak, klasörü kopyala, `sh baslat.sh` yaz. Kurulum yok, paket
 indirme yok, internet gerekmez. Program tezgahı ağda kendisi bulur.
 
+| Nerede çalıştıracaksınız | Ne yapacaksınız |
+|---|---|
+| Tezgah (HEROS/Linux) | `sh baslat.sh` |
+| Windows — CMD / PowerShell | `baslat.bat` |
+| Windows — Git Bash | `sh baslat.sh` |
+| macOS | `sh baslat.sh` |
+
+**Windows'ta simülatörle denemek için → [3B bölümü](#3b-windowsta-tnc-640-programming-station-ile-deneme)**
+
 ---
 
 ## 1. Bu tezgah hakkında bilinenler
@@ -31,7 +40,7 @@ Tezgahtaki `python` komutu **2.7.15** sürümünü veriyor. Bu program Python 3
 gerektiriyor ve Heidenhain'e bağlanmak için kullanılan pyLSV2 kütüphanesi de
 Python 3.5+ istiyor — yani Python 2.7 ile çalışması mümkün değil.
 
-**Çözüm pakete dahil:** `cnclog/vendor/python-linux/` içinde **taşınabilir bir
+**Çözüm pakete dahil:** `cnclog/vendor/python/` içinde **taşınabilir bir
 Python 3.11** geliyor (statik derlenmiş, hiçbir sistem kütüphanesine bağımlı
 değil). Sisteme **hiçbir şey kurulmaz**; arşiv sadece bir klasöre açılır ve
 oradan çalıştırılır. HEROS'un SELinux koruması etkilenmez.
@@ -51,18 +60,24 @@ Hiçbiri olmazsa net bir hata verir, sessizce yarım çalışmaz.
 
 ### 2.1 USB'ye hazırlama (bunu siz yapın)
 
-Program klasörünün **tamamını** USB'ye kopyalayın. Klasör yaklaşık 61 MB'tır
-(çoğu gömülü Python).
+Program klasörünün **tamamını** USB'ye kopyalayın. Klasör yaklaşık 142 MB'tır;
+bunun ~85 MB'ı üç platform için gömülü Python.
 
 ```
 CNC log System/
-├── baslat.sh          ← çalıştırılacak dosya
-├── KULLANIM.md
-├── KURULUM.md
+├── baslat.sh          ← tezgahta / Linux / macOS
+├── baslat.bat         ← Windows (CMD veya PowerShell)
+├── KULLANIM.md        ← operatör rehberi
+├── KURULUM.md         ← bu dosya
 ├── cnclog/            ← program
-├── kurulum/
+├── kurulum/           ← keşif betiği, menü kısayolu, systemd
 └── config.ornek.ini
 ```
+
+> **Yer kazanmak isterseniz:** tezgaha giden USB'de
+> `cnclog/vendor/python/cpython-windows.tar.gz` (25 MB) gereksizdir, silebilirsiniz.
+> Windows'ta denerken ise `cpython-linux-*.tar.gz` dosyaları (59 MB) gereksizdir.
+> Emin değilseniz hepsini bırakın — fazladan dosya zarar vermez.
 
 ### 2.2 Tezgahta (abinizin yapacağı)
 
@@ -91,7 +106,7 @@ başlatmak buna gerek bırakmaz.
 
 ```
 Python 3 hazirlaniyor (musl)... ilk calistirmada bir defa yapilir.
-Hazir: /home/user/Desktop/cnclog/cnclog/vendor/python-linux/rt/python/bin/python3
+Hazir: /home/user/Desktop/cnclog/cnclog/vendor/python/rt/python/bin/python3
 ==============================================================
  CNC Log System 1.0.0 — Heidenhain TNC 640 (TEZGAH-01)
 ==============================================================
@@ -145,6 +160,85 @@ Sonra `config.ini` içinde:
 [surucu]
 tnc_ip = 192.168.1.50
 ```
+
+---
+
+## 3B. Windows'ta TNC 640 Programming Station ile deneme
+
+Tezgaha gitmeden önce programı **simülatörle** denemek en iyisi. Heidenhain'in
+TNC 640 Programming Station yazılımı gerçek kontrol yazılımını çalıştırır, yani
+bu bir taklit değil — gerçek bir LSV2 testidir.
+
+> pyLSV2 kütüphanesinin geliştiricisi testlerinin çoğunu programlama
+> istasyonlarında yapmış ve TNC640 için dört ayrı sürümü doğrulanmış olarak
+> listeliyor. Yani bu senaryonun çalışması bekleniyor.
+
+### Adımlar
+
+**1. Programming Station'ı başlatın** ve kontrol tamamen açılana kadar
+bekleyin. PLC programının çalışıyor olması gerekir (normal açılışta çalışır).
+
+**2. Dış erişimi açın — bu adım atlanırsa hiçbir şey bağlanmaz.**
+
+Kontrol ekranında:
+
+```
+Programlama modu (Programming and Editing)
+   → MOD tuşu
+   → External access = ON
+   → END
+```
+
+Heidenhain bu ayarı güvenlik gerekçesiyle **varsayılan olarak kapalı** tutar.
+Aynı ayar gerçek tezgahta da gereklidir.
+
+**3. Programı çalıştırın.** CMD veya PowerShell açıp:
+
+```
+cd C:\cnclog
+baslat.bat --tara
+```
+
+İlk çalıştırmada gömülü Python bir defa hazırlanır (~10 saniye).
+
+Simülatör aynı bilgisayarda çalıştığı için program onu `127.0.0.1` üzerinde
+bulmalıdır. Beklenen çıktı:
+
+```
+  Bilinen adresler deneniyor (2 adet)…
+  127.0.0.1:19000 açık, doğrulanıyor…
+------------------------------------------------------------
+
+BULUNDU: TNC640 340595 xx (127.0.0.1:19000)
+```
+
+**4. Hangi verilerin okunabildiğini görün:**
+
+```
+baslat.bat --test-baglanti
+```
+
+**5. Kaydı başlatın:**
+
+```
+baslat.bat
+```
+
+Simülatörde bir program çalıştırın; arayüzde durumun ÇALIŞIYOR'a döndüğünü,
+durdurduğunuzda DURUŞ kaydı açıldığını görmelisiniz.
+
+### Bulamazsa
+
+| Belirti | Bakılacak |
+|---|---|
+| `127.0.0.1:19000` listede yok | Simülatör çalışmıyor veya LSV2 portu dinlemiyor |
+| Port açık ama doğrulanamıyor | Dış erişim kapalı → MOD → External access = ON |
+| Bağlanıyor, veri gelmiyor | DNC opsiyonu yok veya PLC programı çalışmıyor |
+
+> **Not:** Windows'ta gömülü Python yalnızca denemek içindir. Tezgaha
+> götüreceğiniz USB'de `cnclog/vendor/python/cpython-windows.tar.gz`
+> dosyasını silebilirsiniz (25 MB kazanırsınız); tezgah Linux tarafını
+> kullanır.
 
 ---
 

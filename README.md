@@ -14,6 +14,10 @@ sh baslat.sh --test-baglanti     # bağlan, tek okuma yap, çık
 sh baslat.sh --surucu simulator  # sahte tezgahla dene
 ```
 
+Windows'ta (CMD / PowerShell) aynı komutlar `baslat.bat` ile çalışır. Windows
+tarafının asıl amacı, TNC 640 Programming Station simülatörüne bağlanıp
+programı tezgaha gitmeden denemektir.
+
 ---
 
 ## Hedef ortamın dayattığı kısıtlar
@@ -87,7 +91,7 @@ cnclog/
 │   └── static/         tek sayfa arayüz (harici kaynak yok)
 └── vendor/
     ├── pyLSV2/         gömülü kütüphane (MIT)
-    └── python-linux/   taşınabilir Python 3.11 (musl + glibc)
+    └── python/         taşınabilir Python 3.11 (musl + glibc)
 ```
 
 ## Veri akışı
@@ -127,6 +131,6 @@ kilidi, çökme kurtarma, sekiz saatlik uçtan uca simüle vardiya.
 ## Lisans notu
 
 `cnclog/vendor/pyLSV2/` üçüncü taraf koddur; MIT lisansı kendi klasöründedir.
-`cnclog/vendor/python-linux/` içindeki Python dağıtımları
+`cnclog/vendor/python/` içindeki Python dağıtımları
 [python-build-standalone](https://github.com/astral-sh/python-build-standalone)
 projesinden gelir (PSF lisansı).

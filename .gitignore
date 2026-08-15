@@ -6,7 +6,7 @@ veri/
 config.ini
 
 # Gomulu Python arsivden buraya acilir; arsivin kendisi surum kontrolunde durur.
-cnclog/vendor/python-linux/rt/
+cnclog/vendor/python/rt/
 
 __pycache__/
 *.py[cod]

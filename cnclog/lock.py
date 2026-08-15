@@ -17,9 +17,20 @@ try:
     import fcntl
 
     HAVE_FCNTL = True
-except ImportError:  # pragma: no cover - Windows, not a target platform
+except ImportError:  # Windows
     fcntl = None  # type: ignore[assignment]
     HAVE_FCNTL = False
+
+try:
+    import msvcrt
+
+    HAVE_MSVCRT = True
+except ImportError:  # everything except Windows
+    msvcrt = None  # type: ignore[assignment]
+    HAVE_MSVCRT = False
+
+#: True when this platform can actually enforce single-instance.
+CAN_LOCK = HAVE_FCNTL or HAVE_MSVCRT
 
 
 class AlreadyRunning(Exception):
@@ -36,9 +47,10 @@ class InstanceLock:
         self.unavailable_reason: Optional[str] = None
 
     def acquire(self) -> None:
-        if not HAVE_FCNTL:
-            # Without flock we cannot guarantee exclusivity; running is still
-            # better than refusing to start on a platform we do not target.
+        if not CAN_LOCK:
+            # No locking primitive at all. Running is still better than
+            # refusing to start; the risk is two copies on one data folder.
+            self.unavailable_reason = "bu platformda kilit desteği yok"
             return
         try:
             os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
@@ -51,10 +63,15 @@ class InstanceLock:
             self.unavailable_reason = str(exc)
             return
         try:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            self._take(handle)
         except OSError:
-            handle.seek(0)
-            other = handle.read().strip() or "bilinmiyor"
+            other = "bilinmiyor"
+            try:
+                handle.seek(0)
+                other = handle.read().strip() or "bilinmiyor"
+            except OSError:
+                # On Windows the holder's byte range is locked against reads.
+                pass
             handle.close()
             raise AlreadyRunning(
                 f"Program zaten çalışıyor (PID {other}).\n"
@@ -62,11 +79,26 @@ class InstanceLock:
                 "Aynı veri klasörüne iki kopya birden yazamaz — "
                 "çalışan kopyayı kapatın veya --dizin ile başka bir klasör verin."
             )
-        handle.seek(0)
-        handle.truncate()
-        handle.write(str(os.getpid()))
-        handle.flush()
         self._handle = handle
+
+    def _take(self, handle) -> None:
+        """Grab the lock, or raise OSError if someone else holds it."""
+        if HAVE_FCNTL:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            handle.seek(0)
+            handle.truncate()
+            handle.write(str(os.getpid()))
+            handle.flush()
+            return
+
+        # Windows: lock one byte. The file must have that byte to lock, so the
+        # pid is written first -- if another process holds it, the write itself
+        # is what fails, which is the same answer.
+        handle.seek(0)
+        handle.write(str(os.getpid()).ljust(16))
+        handle.flush()
+        handle.seek(0)
+        msvcrt.locking(handle.fileno(), msvcrt.LK_NBLCK, 1)
 
     def release(self) -> None:
         if self._handle is None:
@@ -74,6 +106,12 @@ class InstanceLock:
         try:
             if HAVE_FCNTL:
                 fcntl.flock(self._handle.fileno(), fcntl.LOCK_UN)
+            elif HAVE_MSVCRT:
+                self._handle.seek(0)
+                msvcrt.locking(self._handle.fileno(), msvcrt.LK_UNLCK, 1)
+        except OSError:
+            pass
+        try:
             self._handle.close()
         except OSError:
             pass

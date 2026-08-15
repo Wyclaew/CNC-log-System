@@ -21,6 +21,14 @@ echo "  CNC LOG SYSTEM - SISTEM KESIF RAPORU"
 echo "  Tarih: $(date '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo bilinmiyor)"
 echo "============================================================"
 
+# Hangi platformdayiz? Rapordaki bazi bolumler buna gore anlam degistirir.
+SISTEM=$(uname -s 2>/dev/null || echo bilinmiyor)
+PLATFORM=linux
+case "$SISTEM" in
+    *NT*|MINGW*|MSYS*|CYGWIN*|Windows*) PLATFORM=windows ;;
+    Darwin*)                            PLATFORM=macos ;;
+esac
+
 # ---------------------------------------------------------------- 1. SISTEM
 baslik "1. ISLETIM SISTEMI"
 echo "  uname -a:"
@@ -36,6 +44,13 @@ echo "  Kullanici: $(id -un 2>/dev/null) (uid $(id -u 2>/dev/null))"
 
 # ------------------------------------------------------- 2. MASAUSTU ORTAMI
 baslik "2. MASAUSTU ORTAMI  (XFCE mi, HEROS mu?)"
+if [ "$PLATFORM" = "windows" ]; then
+    echo "  Bu bir WINDOWS makinesi (Git Bash / MSYS altinda calisiyorsunuz)."
+    echo "  Bu bolum tezgahin Linux tarafi icindir, burada anlamsizdir."
+    echo "  Windows'ta programi CMD/PowerShell'den baslat.bat ile calistirin."
+elif [ "$PLATFORM" = "macos" ]; then
+    echo "  Bu bir macOS makinesi. Bu bolum tezgah icindir, burada anlamsizdir."
+else
 echo "  XDG_CURRENT_DESKTOP : ${XDG_CURRENT_DESKTOP:-tanimsiz}"
 echo "  DESKTOP_SESSION     : ${DESKTOP_SESSION:-tanimsiz}"
 echo "  DISPLAY             : ${DISPLAY:-tanimsiz}"
@@ -53,6 +68,7 @@ for p in /opt/heros /HEROS /usr/share/heros /mnt/tnc /TNC; do
     [ -e "$p" ] && echo "    VAR: $p"
 done
 echo "    (yukarida hicbir satir yoksa HEROS degil, normal bir Linux)"
+fi
 
 # ------------------------------------------------------------- 3. GUVENLIK
 baslik "3. GUVENLIK KISITLARI (kurulum yapilabilir mi?)"
@@ -118,18 +134,26 @@ case "$0" in
 esac
 KOK=$(cd "$BETIK_DIZIN/.." 2>/dev/null && pwd)
 GOMULU_VAR=0
-for tip in musl gnu; do
-    A="$KOK/cnclog/vendor/python-linux/cpython-$tip.tar.gz"
+if [ "$PLATFORM" = "windows" ]; then
+    GEREKLI=windows
+else
+    GEREKLI=linux-musl
+fi
+for tip in linux-musl linux-gnu windows; do
+    A="$KOK/cnclog/vendor/python/cpython-$tip.tar.gz"
+    ISARET=""
+    [ "$tip" = "$GEREKLI" ] && ISARET="   <-- bu makine icin gerekli olan"
     if [ -f "$A" ]; then
-        echo "    $tip : VAR ($(du -h "$A" 2>/dev/null | cut -f1))"
-        GOMULU_VAR=1
+        echo "    $tip : VAR ($(du -h "$A" 2>/dev/null | cut -f1))$ISARET"
+        [ "$tip" = "$GEREKLI" ] && GOMULU_VAR=1
     else
-        echo "    $tip : yok"
+        echo "    $tip : yok$ISARET"
     fi
 done
 if [ "$GOMULU_VAR" = "0" ] && [ -z "$PY3" ]; then
-    echo "    !!! Ne sistemde Python 3 var ne de gomulu arsiv - program calismaz."
-    echo "        Paketin eksiksiz kopyalandigindan emin olun."
+    echo
+    echo "    !!! Ne sistemde Python 3 var ne de bu platform icin gomulu arsiv."
+    echo "        Program calismaz. Paketin eksiksiz kopyalandigindan emin olun."
 fi
 
 # ---------------------------------------------------------- 5. YAZMA IZNI
@@ -159,8 +183,12 @@ if [ -z "$TNC_IP" ]; then
     echo "  Test icin soyle calistirin:   sh kesif.sh 192.168.1.50"
     echo
     echo "  Bu bilgisayarin ag adresleri:"
-    (ip -4 addr show 2>/dev/null | grep inet || ifconfig 2>/dev/null | grep 'inet ') \
-        | sed 's/^/    /' | head -6
+    if [ "$PLATFORM" = "windows" ]; then
+        ipconfig 2>/dev/null | grep -iE "IPv4|IP Address" | sed 's/^/    /' | head -6
+    else
+        (ip -4 addr show 2>/dev/null | grep inet || ifconfig 2>/dev/null | grep 'inet ') \
+            | sed 's/^/    /' | head -6
+    fi
 else
     echo "  Hedef tezgah: $TNC_IP"
     if command -v ping >/dev/null 2>&1; then
@@ -209,12 +237,21 @@ done
 
 # ----------------------------------------------------------------- 8. OZET
 baslik "8. SONUC"
-if [ -z "$BULUNAN_PY" ]; then
-    echo "  * Python yok -> program BU MAKINEDE CALISAMAZ."
-    echo "    Tezgahin yanindaki baska bir Linux bilgisayara kurulmali."
+if [ -n "$PY3" ]; then
+    echo "  * Sistemde Python 3 var -> program dogrudan calisir."
+elif [ "$GOMULU_VAR" = "1" ]; then
+    echo "  * Sistemde Python 3 yok ama pakete gomulu surum var -> program"
+    echo "    yine calisir. Ilk acilista Python bir defa hazirlanir."
 else
-    echo "  * Python var -> program buraya kopyalanip calistirilabilir."
-    echo "    Kurulum gerekmez, sadece klasoru kopyalayin."
+    echo "  * Ne sistemde Python 3 var ne de bu platform icin gomulu arsiv."
+    echo "    Program BU MAKINEDE CALISAMAZ. Paket eksik kopyalanmis olabilir."
+fi
+if [ "$PLATFORM" = "windows" ]; then
+    echo
+    echo "  * Windows'ta calistirmak icin CMD veya PowerShell acip:"
+    echo "        baslat.bat"
+    echo "    (Git Bash'ten 'sh baslat.sh' da calisir.)"
+    echo "  * Windows'ta esas amac TNC 640 Programming Station ile denemektir."
 fi
 echo
 echo "  BUNLARI DA KONTROL EDIN (bu betik goremez, tezgah ekranindan bakin):"

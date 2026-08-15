@@ -105,9 +105,11 @@ class AutoDriver(Driver):
         )
         return (
             "Ağda Heidenhain kontrol bulunamadı ({0}).\n"
-            "Kontrol edilecekler:\n"
+            "EN SIK SEBEP: tezgahta dış erişim kapalıdır. Kontrol ekranında:\n"
+            "  Programlama modu → MOD tuşu → External access = ON → END\n"
+            "Diğer kontroller:\n"
             "  - Tezgah açık mı ve ağ kablosu takılı mı?\n"
-            "  - Tezgahta LSV2/DNC erişimi açık mı? (port {1})\n"
+            "  - Port {1} (LSV2) erişilebilir mi?\n"
             "  - Adresi biliyorsanız config.ini içinde [surucu] tnc_ip "
             "satırına yazın;\n"
             "    o adres her aramada ilk sırada denenir.\n"

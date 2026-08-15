@@ -72,18 +72,44 @@ def build_parser() -> argparse.ArgumentParser:
 # --------------------------------------------------------------------- browser
 
 
+def _tarayici_adaylari() -> list:
+    """Chromium-family browsers to try, in order, for this platform."""
+    adaylar = [
+        shutil.which(isim)
+        for isim in (
+            "chromium", "chromium-browser", "google-chrome",
+            "google-chrome-stable", "brave-browser", "microsoft-edge",
+            "qupzilla", "falkon",
+        )
+    ]
+    if os.name == "nt":
+        # Windows browsers are not on PATH; check the usual install locations.
+        program_files = [
+            os.environ.get("ProgramFiles", r"C:\Program Files"),
+            os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+            os.environ.get("LOCALAPPDATA", ""),
+        ]
+        goreli = [
+            r"Google\Chrome\Application\chrome.exe",
+            r"Microsoft\Edge\Application\msedge.exe",
+            r"BraveSoftware\Brave-Browser\Application\brave.exe",
+        ]
+        for kok in program_files:
+            if not kok:
+                continue
+            for parca in goreli:
+                adaylar.append(os.path.join(kok, parca))
+    return [a for a in adaylar if a and os.path.exists(a)]
+
+
 def _tarayici_ac(url: str) -> None:
     """Open the UI, preferring app mode so it looks like a real window.
 
-    A Chromium/Chrome window started with --app has no address bar and shows up
-    in the XFCE task list as its own window, which is what "alt-tab edip
+    A Chromium-family window started with --app has no address bar and shows up
+    in the task list as its own window, which is what "alt-tab edip
     bakabileceğimiz bir program" actually means in practice.
     """
-    for isim in ("chromium", "chromium-browser", "google-chrome",
-                 "google-chrome-stable", "brave-browser", "microsoft-edge"):
-        yol = shutil.which(isim)
-        if not yol:
-            continue
+    for yol in _tarayici_adaylari():
         try:
             subprocess.Popen(
                 [yol, f"--app={url}", "--window-size=1280,860"],
@@ -171,10 +197,15 @@ def _tara(args) -> int:
 
     if bulunan is None:
         print("\nHiçbir Heidenhain kontrol bulunamadı.\n")
-        print("Kontrol edilecekler:")
-        print("  - Tezgah açık mı, ağ kablosu takılı mı?")
-        print("  - Tezgahta LSV2 / DNC erişimi açık mı?")
+        print("EN SIK SEBEP — tezgahta dış erişim kapalı:")
+        print("  Kontrol ekranında Programlama moduna geçin, MOD tuşuna basın,")
+        print("  'External access' ayarını ON yapın, END ile çıkın.")
+        print("  (Bu ayar TNC 640 Programming Station simülatöründe de gerekir.)")
+        print("\nDiğer kontroller:")
+        print("  - Tezgah/simülatör açık mı, PLC programı çalışıyor mu?")
         print(f"  - Bu makine tezgahla aynı ağda mı? (port {port})")
+        print("  - Simülatör aynı bilgisayarda ise 127.0.0.1 denenmiş olmalı;")
+        print("    yukarıdaki listede göründüğünden emin olun.")
         print("  - Adresi biliyorsanız config.ini içine yazın:")
         print("        [surucu]")
         print("        tnc_ip = 192.168.1.50")
@@ -431,11 +462,15 @@ def _normal_calistir(args) -> int:
 def main(argv: Optional[list] = None) -> int:
     # Line-buffer stdout so its lines stay interleaved with stderr in the right
     # order when the output is piped or redirected to a file -- which is how it
-    # runs as a service.
-    try:
-        sys.stdout.reconfigure(line_buffering=True)  # type: ignore[attr-defined]
-    except (AttributeError, ValueError):
-        pass  # Python < 3.7 or a stream that cannot be reconfigured.
+    # runs as a service. UTF-8 because every message here is Turkish and the
+    # Windows console defaults to a code page that mangles ş, ğ and ı.
+    for stream, buffered in ((sys.stdout, True), (sys.stderr, False)):
+        try:
+            stream.reconfigure(  # type: ignore[attr-defined]
+                encoding="utf-8", errors="replace", line_buffering=buffered
+            )
+        except (AttributeError, ValueError):
+            pass  # Python < 3.7 or a stream that cannot be reconfigured.
 
     args = build_parser().parse_args(argv)
 

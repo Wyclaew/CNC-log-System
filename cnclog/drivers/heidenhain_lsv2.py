@@ -177,9 +177,13 @@ class HeidenhainLsv2Driver(Driver):
             self.disconnect()
             raise DriverError(
                 "Bağlantı kuruldu ama tezgahtan hiçbir veri okunamıyor.\n"
-                "En olası sebep: DNC yazılım opsiyonu (Opsiyon 18) tezgahta "
-                "lisanslı değil,\nveya LSV2/DNC erişimi ağ ayarlarından kapalı. "
-                "Tezgah servisinden\nLSV2 erişiminin açılmasını isteyin."
+                "Sırasıyla şunlara bakın:\n"
+                "  1) Dış erişim açık mı?  Programlama modu → MOD →\n"
+                "     External access = ON → END\n"
+                "  2) DNC yazılım opsiyonu (Opsiyon 18) lisanslı mı?\n"
+                "     MOD menüsünden opsiyon listesine bakın.\n"
+                "  3) Kontrolün PLC programı çalışıyor mu?\n"
+                "Bunlar olmadan LSV2 bağlanır ama veri vermez."
             )
 
     def _probe(self) -> None:
