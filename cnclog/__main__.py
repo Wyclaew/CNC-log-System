@@ -72,14 +72,27 @@ def build_parser() -> argparse.ArgumentParser:
 # --------------------------------------------------------------------- browser
 
 
+#: Browsers that understand Chromium's --app flag. Anything else must be
+#: handed the plain URL: QupZilla -- the browser HEROS ships -- silently
+#: ignores an unknown flag and opens its start page instead, which looks
+#: exactly like the program failing to start.
+_CHROMIUM_AILESI = ("chrome", "chromium", "brave", "edge", "vivaldi", "opera")
+
+
+def _app_modu_destekler(yol: str) -> bool:
+    return any(ad in os.path.basename(yol).lower() for ad in _CHROMIUM_AILESI)
+
+
 def _tarayici_adaylari() -> list:
-    """Chromium-family browsers to try, in order, for this platform."""
+    """Browsers to try, most preferred first, for this platform."""
     adaylar = [
         shutil.which(isim)
         for isim in (
+            # Chromium family first: they give a clean app window.
             "chromium", "chromium-browser", "google-chrome",
             "google-chrome-stable", "brave-browser", "microsoft-edge",
-            "qupzilla", "falkon",
+            # Then whatever else is around. QupZilla ships with HEROS.
+            "qupzilla", "falkon", "firefox", "epiphany", "midori",
         )
     ]
     if os.name == "nt":
@@ -103,16 +116,21 @@ def _tarayici_adaylari() -> list:
 
 
 def _tarayici_ac(url: str) -> None:
-    """Open the UI, preferring app mode so it looks like a real window.
+    """Open the UI in whatever browser this machine has.
 
-    A Chromium-family window started with --app has no address bar and shows up
-    in the task list as its own window, which is what "alt-tab edip
-    bakabileceğimiz bir program" actually means in practice.
+    Chromium-family browsers get --app, which gives a window with no address
+    bar that alt-tabs like its own program. Every other browser gets the URL
+    on its own -- passing them a flag they do not know makes them open a blank
+    start page and drop the URL entirely.
     """
     for yol in _tarayici_adaylari():
+        if _app_modu_destekler(yol):
+            komut = [yol, f"--app={url}", "--window-size=1280,860"]
+        else:
+            komut = [yol, url]
         try:
             subprocess.Popen(
-                [yol, f"--app={url}", "--window-size=1280,860"],
+                komut,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
@@ -428,6 +446,9 @@ def _normal_calistir(args) -> int:
             return 1
 
         print(f" Arayüz     : {url}")
+        print(" " + "-" * 61)
+        print(f" Tarayıcı açılmazsa veya boş sayfa gelirse, tarayıcıyı elle")
+        print(f" açıp adres satırına şunu yazın:   {url}")
         if aciga_acik:
             print(" UYARI      : Arayüz ağa açık (bind = "
                   f"{cfg.web_bind}). Sadece güvendiğiniz ağda kullanın.")

@@ -12,16 +12,35 @@ indirme yok, internet gerekmez. Program tezgahı ağda kendisi bulur.
 | Nerede çalıştıracaksınız | Ne yazacaksınız |
 |---|---|
 | **Tezgah (HEROS)** | **`python baslat.py`** ← bunu kullanın |
-| Linux / macOS | `python3 baslat.py` veya `sh baslat.sh` |
+| Tezgah — alternatif | `bash baslat.sh` |
+| Linux / macOS | `python3 baslat.py` |
 | Windows — CMD / PowerShell | `baslat.bat` |
 | Windows — Git Bash | `sh baslat.sh` |
 
-> **HEROS'ta neden `baslat.py`?** `sh baslat.sh` şu hatayı verebiliyor:
-> `sh: no permission to execute baslat.sh`. Dosya sistemi "çalıştırma yasak"
-> (noexec) bağlanmış olabiliyor ve `chmod +x` bunu çözmüyor, `sudo` şifresi de
-> yok. `python baslat.py` bu sorunu tamamen atlar: çalıştırılan şey zaten
-> kurulu olan `python`, dosya yalnızca okunur. **Bir şey ters giderse:**
-> `python baslat.py --teshis`
+> **HEROS'ta `sh baslat.sh` neden çalışmıyor?**
+> `sh: no permission to execute baslat.sh` hatası alırsınız. HEROS'un `sh`
+> komutu kısıtlı bir kabuktur (BusyBox ash) ve betiği çalıştırmayı reddeder;
+> `chmod +x` ve `sudo` bunu çözmez.
+>
+> **İki çözüm de işe yarar:**
+> - `python baslat.py` — önerilen. Çalıştırılan şey `python`, dosya yalnızca
+>   okunur; çalıştırma izni hiç devreye girmez.
+> - `bash baslat.sh` — HEROS'ta gerçek `bash` kurulu ve bu şekilde çalışır.
+>
+> **Bir şey ters giderse:** `python baslat.py --teshis`
+
+### Çift tıklayarak başlatmak
+
+Bir kez şunu çalıştırın:
+
+```bash
+python baslat.py --kisayol
+```
+
+Masaüstüne ve XFCE menüsüne **CNC Log** kısayolu koyar. Bundan sonra
+operatörün terminal açmasına gerek kalmaz — simgeye çift tıklaması yeterlidir.
+Kısayol `python baslat.py` çağırdığı için çalıştırma izni sorunu burada da
+ortaya çıkmaz.
 
 **Windows'ta simülatörle denemek için → [3B bölümü](#3b-windowsta-tnc-640-programming-station-ile-deneme)**
 
@@ -131,8 +150,14 @@ Hazir: /home/user/Desktop/cnclog/cnclog/vendor/python/rt/python/bin/python3
  Kayıt başladı. Durdurmak için Ctrl+C.
 ```
 
-Tarayıcı (QupZilla) kendiliğinden açılır. Açılmazsa **Menü → Tools → QupZilla**
-ile açıp adres satırına `127.0.0.1:8760` yazın.
+Tarayıcı (QupZilla) kendiliğinden açılır ve arayüz gelir.
+
+> **Boş bir başlangıç sayfası açılırsa:** QupZilla'nın adres satırına elle
+> `127.0.0.1:8760` yazın. Program arka planda zaten çalışıyordur — terminalde
+> "Kayıt başladı" yazısını görüyorsanız her şey yolundadır, sadece tarayıcı
+> adrese gitmemiştir.
+
+Tarayıcı hiç açılmazsa: **Menü → Tools → QupZilla** ile açıp aynı adresi yazın.
 
 ---
 
@@ -401,7 +426,9 @@ kayıtları çok küçüktür ve **hiç silinmez**.
 
 | Belirti | Çözüm |
 |---|---|
-| `sh: no permission to execute baslat.sh` | `python baslat.py` kullanın. Dosya sistemi noexec bağlanmış; `chmod +x` ve `sudo` çözmez. |
+| `sh: no permission to execute baslat.sh` | `python baslat.py` veya `bash baslat.sh` kullanın. HEROS'un `sh`'ı kısıtlı; `chmod +x` ve `sudo` çözmez. |
+| `python: can't open file 'baslat.py'` | Dosya klasörde yok — eski bir kopya kullanıyorsunuz. Paketi yeniden kopyalayın. |
+| Tarayıcı açıldı ama boş sayfa | Adres satırına `127.0.0.1:8760` yazın. Program çalışıyor, tarayıcı adrese gitmemiş. |
 | `Calisir bir Python 3 bulunamadi` | `python baslat.py --teshis` çalıştırıp çıktıyı gönderin. |
 | `Python'u acacak yazilabilir bir klasor bulunamadi` | Program klasörü salt-okunur (USB). Ev dizinine kopyalayın; `baslat.py` ayrıca `/tmp`'yi de dener. |
 | `TEZGAH BULUNDU ama erişime izin vermedi` | Dış erişim kapalı. PROGRAMLAMA modu → MOD → External access = ON → END. Adres aramanıza gerek yok. |
@@ -442,6 +469,7 @@ Tezgahta (HEROS) ve genel olarak en güvenli yol:
 
 ```bash
 python baslat.py                   # normal çalıştır
+python baslat.py --kisayol         # masaüstüne çift tıklanır kısayol koy
 python baslat.py --teshis          # ortamı incele (sorun varsa ilk bu)
 python baslat.py --tara            # tezgahı ağda ara
 python baslat.py --test-baglanti   # bağlan, veri oku, çık

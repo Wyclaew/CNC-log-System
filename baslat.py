@@ -4,6 +4,7 @@
     python baslat.py              normal calistir
     python baslat.py --teshis     ortami incele, hicbir sey calistirma
     python baslat.py --tara       tezgahi agda ara
+    python baslat.py --kisayol    masaustune/menuye cift tiklanir kisayol koy
     (butun parametreler programa aktarilir)
 
 NEDEN BU DOSYA VAR
@@ -321,9 +322,92 @@ def teshis():
 # ----------------------------------------------------------------- main
 
 
+KISAYOL_SABLONU = """[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CNC Log
+GenericName=Tezgah Veri Kaydi
+Comment=Tezgah verilerini kaydeder ve logu gosterir
+Exec=%(exec)s
+Path=%(klasor)s
+Icon=utilities-system-monitor
+Terminal=true
+Categories=Utility;Monitor;
+StartupNotify=true
+"""
+
+
+def kisayol_olustur():
+    """Cift tiklanabilir bir kisayol yazar.
+
+    Exec satiri 'python baslat.py' seklindedir: calistirilan sey python
+    yorumlayicisidir, bu yuzden betik dosyasinin calistirma bitine ihtiyaci
+    yoktur. noexec bagli bir dosya sisteminde de calisir.
+    """
+    py = sys.executable or "python"
+    betik = os.path.join(KLASOR, "baslat.py")
+
+    # .desktop Exec satirinda bosluk iceren yollar tirnak icinde olmali,
+    # yoksa yol iki ayri argumana bolunur ve kisayol calismaz.
+    def alintila(yol):
+        if " " in yol or '"' in yol:
+            return '"' + yol.replace('"', '\\"') + '"'
+        return yol
+
+    icerik = KISAYOL_SABLONU % {
+        "exec": "%s %s" % (alintila(py), alintila(betik)),
+        "klasor": KLASOR,
+    }
+
+    hedefler = []
+    menu = os.path.join(os.path.expanduser("~"), ".local", "share",
+                        "applications")
+    hedefler.append(os.path.join(menu, "cnclog.desktop"))
+    for ad in ("Desktop", "Masaüstü", "Masaustu"):
+        masaustu = os.path.join(os.path.expanduser("~"), ad)
+        if os.path.isdir(masaustu):
+            hedefler.append(os.path.join(masaustu, "cnclog.desktop"))
+            break
+
+    yazilan = []
+    for hedef in hedefler:
+        try:
+            dizin = os.path.dirname(hedef)
+            if not os.path.isdir(dizin):
+                os.makedirs(dizin)
+            dosya = open(hedef, "w")
+            try:
+                dosya.write(icerik)
+            finally:
+                dosya.close()
+            try:
+                os.chmod(hedef, 0o755)  # XFCE masaustunde bu gerekebiliyor
+            except Exception:
+                pass
+            yazilan.append(hedef)
+        except Exception as hata:
+            print("  yazilamadi: %s (%s)" % (hedef, hata))
+
+    if not yazilan:
+        print("Kisayol olusturulamadi.")
+        return 1
+
+    print("Kisayol olusturuldu:")
+    for yol in yazilan:
+        print("  " + yol)
+    print("")
+    print("Artik XFCE menusunde 'CNC Log' olarak gorunur ve masaustundeki")
+    print("simgeye cift tiklayarak baslatabilirsiniz.")
+    print("Menude hemen gorunmezse oturumu kapatip acin.")
+    return 0
+
+
 def main(argv):
     if "--teshis" in argv:
         return teshis()
+
+    if "--kisayol" in argv:
+        return kisayol_olustur()
 
     if "--python-bilgi" in argv:
         # Kisa surum: sadece hangi Python kullanilacagini soyler.

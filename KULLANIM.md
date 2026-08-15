@@ -12,7 +12,9 @@ yoktur — açık kalması yeterlidir.
 
 | Ne yapmak istiyorsunuz | Ne yapacaksınız |
 |---|---|
-| Programı başlatmak | Menüden **CNC Log**, veya terminalde `python baslat.py` |
+| Programı başlatmak | Masaüstünde **CNC Log** simgesine çift tıklayın |
+| Simge yoksa | Terminalde `python baslat.py` |
+| Arayüz boş sayfa açtıysa | Adres satırına `127.0.0.1:8760` yazın |
 | Ekrana bakmak | Tarayıcı penceresi; alt-tab ile geçilir |
 | Programı kapatmak | Terminalde **Ctrl+C** |
 | Günün raporunu almak | Arayüzde **Rapor** sekmesi |
