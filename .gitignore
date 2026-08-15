@@ -1,0 +1,13 @@
+# Kayitlar ve calisma dosyalari -- makineye ozel, surum kontrolune girmez.
+veri/
+*.log
+
+# Kullanicinin kendi ayarlari (ornegi config.ornek.ini olarak tutulur)
+config.ini
+
+# Gomulu Python arsivden buraya acilir; arsivin kendisi surum kontrolunde durur.
+cnclog/vendor/python-linux/rt/
+
+__pycache__/
+*.py[cod]
+.DS_Store

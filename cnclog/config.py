@@ -28,10 +28,11 @@ DEFAULTS = {
         "saklama_gun": "90",
     },
     "surucu": {
-        "tip": "simulator",
-        "tnc_ip": "192.168.1.50",
+        "tip": "auto",
+        "tnc_ip": "",
         "tnc_port": "19000",
         "zaman_asimi_sn": "5.0",
+        "otomatik_arama": "evet",
     },
     "opcua": {
         "adres": "",
@@ -81,10 +82,13 @@ class Config:
     retention_days: int = 90
 
     # [surucu]
-    driver: str = "simulator"
-    tnc_ip: str = "192.168.1.50"
+    driver: str = "auto"
+    #: Empty means "look for it". A value here is tried first, every time.
+    tnc_ip: str = ""
     tnc_port: int = 19000
     timeout_s: float = 5.0
+    #: Whether discovery may sweep the local /24 after the likely addresses.
+    auto_scan: bool = True
 
     # [opcua] -- only used by the heidenhain_opcua driver (Option 56).
     # Node ids differ per machine and OEM, so they are configured rather than
@@ -178,10 +182,11 @@ def load_config(path: Optional[str] = None, base_dir: Optional[str] = None) -> C
         log_interval_s=max(0.0, _as_float(get("toplama", "log_araligi_sn"), 30.0)),
         rapid_feed_threshold=_as_float(get("toplama", "hizli_ilerleme_esigi"), 5000.0),
         retention_days=max(0, _as_int(get("toplama", "saklama_gun"), 90)),
-        driver=get("surucu", "tip").strip().lower() or "simulator",
+        driver=get("surucu", "tip").strip().lower() or "auto",
         tnc_ip=get("surucu", "tnc_ip").strip(),
         tnc_port=_as_int(get("surucu", "tnc_port"), 19000),
         timeout_s=_as_float(get("surucu", "zaman_asimi_sn"), 5.0),
+        auto_scan=_as_bool(get("surucu", "otomatik_arama"), True),
         opcua_url=get("opcua", "adres").strip(),
         opcua_user=get("opcua", "kullanici").strip(),
         opcua_password=get("opcua", "sifre").strip(),

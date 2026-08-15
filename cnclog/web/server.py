@@ -41,6 +41,7 @@ class _Handler(BaseHTTPRequestHandler):
         return
 
     def do_GET(self) -> None:  # noqa: N802 - name fixed by BaseHTTPRequestHandler
+        self._responded = False
         parsed = urlparse(self.path)
         params = {k: v[0] for k, v in parse_qs(parsed.query).items()}
         path = parsed.path
@@ -50,11 +51,18 @@ class _Handler(BaseHTTPRequestHandler):
                 self._handle_api(path[len("/api/"):], params)
             else:
                 self._serve_static(path)
-        except BrokenPipeError:
+        except (BrokenPipeError, ConnectionResetError):
             # The browser navigated away mid-response. Not an error.
             return
         except Exception as exc:  # noqa: BLE001 - one bad request must not kill the UI
-            self._send_json({"hata": f"{type(exc).__name__}: {exc}"}, status=500)
+            # If the failure happened after headers went out, sending a second
+            # response would raise again and take the handler thread with it.
+            if getattr(self, "_responded", False):
+                return
+            try:
+                self._send_json({"hata": f"{type(exc).__name__}: {exc}"}, status=500)
+            except Exception:  # noqa: BLE001
+                return
 
     # ------------------------------------------------------------------- api
 
@@ -75,6 +83,7 @@ class _Handler(BaseHTTPRequestHandler):
         elif endpoint == "rapor.csv":
             tarih = params.get("tarih", "bugun")
             body = api.rapor_csv(params).encode("utf-8")
+            self._responded = True
             self.send_response(200)
             self.send_header("Content-Type", "text/csv; charset=utf-8")
             self.send_header(
@@ -91,6 +100,7 @@ class _Handler(BaseHTTPRequestHandler):
         body = json.dumps(payload, ensure_ascii=False, default=_json_default).encode(
             "utf-8"
         )
+        self._responded = True
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
@@ -117,6 +127,7 @@ class _Handler(BaseHTTPRequestHandler):
         with open(target, "rb") as handle:
             body = handle.read()
 
+        self._responded = True
         self.send_response(200)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))

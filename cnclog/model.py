@@ -204,7 +204,9 @@ def format_duration(seconds: Optional[float]) -> str:
     """Render a duration the way the operator reads it: '3dk 29sn', '2sa 05dk'."""
     if seconds is None:
         return "—"
-    total = int(round(seconds))
+    # Clamp: a clock adjustment can produce a negative span, and "-3dk" in a
+    # downtime report would be nonsense.
+    total = max(0, int(round(seconds)))
     if total < 60:
         return f"{total}sn"
     if total < 3600:

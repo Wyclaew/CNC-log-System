@@ -208,7 +208,10 @@ class StateTracker:
                 return "program yüklü değil (parça değişimi veya bekleme)"
             return f"program durduruldu ({snap.program_name})"
         if state is MachineState.BAGLANTI_YOK:
-            return snap.error or "tezgah ile bağlantı kesildi"
+            # Driver errors carry multi-line troubleshooting advice; the event
+            # row wants the headline. The full text stays in the UI's error field.
+            first_line = (snap.error or "").strip().splitlines()
+            return first_line[0] if first_line else "tezgah ile bağlantı kesildi"
         if state is MachineState.KURULUM:
             return "elle kumanda / kurulum modu"
         return None

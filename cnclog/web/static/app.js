@@ -75,8 +75,12 @@
     if (d.pending_change) {
       $("durumNot").textContent =
         "kayda geçmesi için " + sayi(d.idle_threshold_s) + " sn eşiği bekleniyor";
+    } else if (!d.connected && d.arama && d.arama.length) {
+      // Auto driver still searching: show the last step, not just "no link".
+      $("durumNot").textContent = d.arama[d.arama.length - 1];
     } else if (!d.connected && d.error) {
-      $("durumNot").textContent = d.error;
+      // Multi-line driver errors would blow up the card; first line is enough.
+      $("durumNot").textContent = String(d.error).split("\n")[0];
     } else {
       $("durumNot").textContent = "";
     }

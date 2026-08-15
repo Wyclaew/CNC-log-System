@@ -63,6 +63,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Raporu ekrana bas ve çık (bugun | dun | YYYY-AA-GG)")
     parser.add_argument("--test-baglanti", action="store_true",
                         help="Tezgaha bağlan, tek okuma yap, sonucu göster ve çık")
+    parser.add_argument("--tara", action="store_true",
+                        help="Ağda Heidenhain kontrol ara ve bulunanları listele")
     parser.add_argument("--surum", action="version", version=f"cnclog {__version__}")
     return parser
 
@@ -143,6 +145,53 @@ def _rapor_calistir(args, tarih_metni: str) -> int:
     return 0
 
 
+def _tara(args) -> int:
+    """Look for a control and report, without touching the database."""
+    from . import discovery
+    from .config import load_config
+
+    cfg = load_config(args.config, base_dir=args.dizin or os.getcwd())
+    port = cfg.tnc_port or discovery.LSV2_PORT
+
+    print("Heidenhain kontrol aranıyor…")
+    print(f"  Port          : {port} (LSV2)")
+    print(f"  Yapılandırılan: {cfg.tnc_ip or '(yok — otomatik aranacak)'}")
+    adresler = discovery.local_addresses()
+    print(f"  Bu makinenin adresleri: {', '.join(adresler) or '(bulunamadı)'}")
+    print("-" * 60)
+
+    bulunan = discovery.find_control(
+        configured_ip=cfg.tnc_ip or None,
+        port=port,
+        timeout=cfg.timeout_s,
+        scan_subnet=cfg.auto_scan,
+        on_progress=lambda m: print(f"  {m}"),
+    )
+    print("-" * 60)
+
+    if bulunan is None:
+        print("\nHiçbir Heidenhain kontrol bulunamadı.\n")
+        print("Kontrol edilecekler:")
+        print("  - Tezgah açık mı, ağ kablosu takılı mı?")
+        print("  - Tezgahta LSV2 / DNC erişimi açık mı?")
+        print(f"  - Bu makine tezgahla aynı ağda mı? (port {port})")
+        print("  - Adresi biliyorsanız config.ini içine yazın:")
+        print("        [surucu]")
+        print("        tnc_ip = 192.168.1.50")
+        return 1
+
+    print(f"\nBULUNDU: {bulunan}")
+    print("\nBu adres otomatik kullanılacak; config.ini'ye yazmanız gerekmez.")
+    print("Sabitlemek isterseniz:")
+    print("        [surucu]")
+    print(f"        tnc_ip = {bulunan.host}")
+    if discovery.port_open(bulunan.host, discovery.OPCUA_PORT, timeout=1.0):
+        print(f"\nNot: {bulunan.host}:{discovery.OPCUA_PORT} de açık — OPC UA NC")
+        print("Server (Opsiyon 56) etkin olabilir. Gerçek F/S değerleri için")
+        print("bunu kullanabilirsiniz, bkz. KURULUM.md.")
+    return 0
+
+
 def _test_baglanti(args) -> int:
     """Connect once and print what the control actually exposes.
 
@@ -165,10 +214,17 @@ def _test_baglanti(args) -> int:
 
     cfg = app.cfg
     print(f"Sürücü      : {app.driver.describe()}")
-    if cfg.driver != "simulator":
+    if cfg.driver not in ("simulator", "auto"):
         print(f"Adres       : {cfg.tnc_ip}:{cfg.tnc_port}")
+    elif cfg.driver == "auto":
+        print(f"Adres       : otomatik aranacak"
+              + (f" (önce {cfg.tnc_ip})" if cfg.tnc_ip else ""))
     print(f"Zaman aşımı : {cfg.timeout_s:g} sn")
     print("-" * 60)
+
+    # Discovery can take a few seconds; show it happening rather than hanging.
+    if hasattr(app.driver, "progress_callback"):
+        app.driver.progress_callback = lambda m: print(f"  {m}")
 
     try:
         app.driver.connect()
@@ -359,7 +415,16 @@ def _normal_calistir(args) -> int:
     if web is not None:
         web.stop()
     app.stop()
-    print("Açık kayıtlar kapatıldı. Veriler saklandı.")
+
+    if not app.collector.stopped_cleanly:
+        print("UYARI: kayıt işlemi zamanında durmadı; açık kayıtlar bir sonraki")
+        print("       açılışta otomatik kapatılacak. Veri kaybı yok.")
+    else:
+        print("Açık kayıtlar kapatıldı. Veriler saklandı.")
+
+    if app.collector.internal_errors:
+        print(f"NOT: çalışma sırasında {app.collector.internal_errors} iç hata "
+              "oluştu; ayrıntı log dosyasında.")
     return 0
 
 
@@ -376,6 +441,8 @@ def main(argv: Optional[list] = None) -> int:
 
     if args.rapor is not None:
         return _rapor_calistir(args, args.rapor)
+    if args.tara:
+        return _tara(args)
     if args.test_baglanti:
         return _test_baglanti(args)
     return _normal_calistir(args)

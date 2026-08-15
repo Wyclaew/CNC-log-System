@@ -6,36 +6,134 @@
 #     ./baslat.sh --web-yok       arayuzsuz, sadece kayit tut
 #     ./baslat.sh --test-baglanti tezgaha baglanmayi dene
 #     ./baslat.sh --rapor bugun   gun raporunu ekrana bas
+#     ./baslat.sh --python-bilgi  hangi Python kullanilacagini goster
 #
 # Verilen butun parametreler programa oldugu gibi aktarilir.
+#
+# PYTHON HAKKINDA
+# ---------------
+# Heidenhain HEROS uzerinde sistem Python'u 2.7'dir ve bu program Python 3
+# gerektirir. Bu yuzden paketin icinde tasinabilir bir Python 3.11 gelir
+# (cnclog/vendor/python-linux/). Sisteme HICBIR SEY KURULMAZ: arsiv sadece
+# yazilabilir bir klasore acilir ve oradan calistirilir.
+#
+# Sira: sistem python3 -> daha once acilmis gomulu -> arsivden ac.
 
-# Betigin bulundugu klasore gec; program veriyi buraya yazar.
-KLASOR=$(cd "$(dirname "$0")" 2>/dev/null && pwd)
-cd "$KLASOR" || {
-    echo "HATA: program klasorune girilemedi: $KLASOR" >&2
+# Betigin klasoru. Shell'in kendi genisletmesiyle bulunur: 'dirname' harici bir
+# komuttur ve kisitli bir kurulumda bulunmayabilir.
+case "$0" in
+    */*) BETIK_DIZIN="${0%/*}" ;;
+    *)   BETIK_DIZIN="." ;;
+esac
+KLASOR=$(cd "$BETIK_DIZIN" 2>/dev/null && pwd)
+if [ -z "$KLASOR" ] || ! cd "$KLASOR"; then
+    echo "HATA: program klasorune girilemedi: $BETIK_DIZIN" >&2
     exit 1
-}
+fi
 
-# Uygun bir Python bul. HEROS gibi kisitli sistemlerde 'python3' olmayabilir.
-PY=""
-for aday in python3 python3.12 python3.11 python3.10 python3.9 python3.8 python3.7; do
-    if command -v "$aday" >/dev/null 2>&1; then
-        if "$aday" -c 'import sys; sys.exit(0 if sys.version_info >= (3,7) else 1)' 2>/dev/null; then
-            PY="$aday"
-            break
-        fi
-    fi
+GOMULU_DIZIN="$KLASOR/cnclog/vendor/python-linux"
+BILGI_MODU=0
+for arg in "$@"; do
+    [ "$arg" = "--python-bilgi" ] && BILGI_MODU=1
 done
 
+bilgi() { [ "$BILGI_MODU" = "1" ] && echo "  $1"; }
+
+# Bir Python'un gercekten ise yarayip yaramadigini dener.
+# Sadece "var mi" degil: surumu yeterli mi ve gerekli moduller iceride mi.
+python_uygun_mu() {
+    [ -x "$1" ] || return 1
+    "$1" - <<'PYEOF' >/dev/null 2>&1
+import sys
+if sys.version_info < (3, 7):
+    raise SystemExit(1)
+import sqlite3, socket, json, threading, configparser, csv, http.server
+raise SystemExit(0)
+PYEOF
+}
+
+PY=""
+
+# --- 1) Sistemde kullanilabilir bir Python 3 var mi? ---------------------
+for aday in python3 python3.13 python3.12 python3.11 python3.10 python3.9 \
+            python3.8 python3.7; do
+    YOL=$(command -v "$aday" 2>/dev/null) || continue
+    if python_uygun_mu "$YOL"; then
+        PY="$YOL"
+        bilgi "sistem Python bulundu: $YOL"
+        break
+    fi
+    bilgi "atlandi (surum veya modul eksik): $YOL"
+done
+
+# --- 2) Daha once acilmis gomulu Python var mi? --------------------------
+if [ -z "$PY" ]; then
+    for kok in "$GOMULU_DIZIN/rt" "$HOME/.cnclog/python"; do
+        if python_uygun_mu "$kok/python/bin/python3"; then
+            PY="$kok/python/bin/python3"
+            bilgi "gomulu Python kullaniliyor: $PY"
+            break
+        fi
+    done
+fi
+
+# --- 3) Arsivden ac ------------------------------------------------------
+if [ -z "$PY" ]; then
+    if ! command -v tar >/dev/null 2>&1; then
+        echo "HATA: 'tar' komutu yok, gomulu Python acilamiyor." >&2
+        exit 1
+    fi
+
+    # Yazilabilir bir hedef sec. USB salt-okunur baglanmis olabilir.
+    HEDEF=""
+    for aday in "$GOMULU_DIZIN/rt" "$HOME/.cnclog/python"; do
+        if mkdir -p "$aday" 2>/dev/null && [ -w "$aday" ]; then
+            HEDEF="$aday"
+            break
+        fi
+    done
+    if [ -z "$HEDEF" ]; then
+        echo "HATA: Python'u acacak yazilabilir bir klasor bulunamadi." >&2
+        echo "      Program klasorunu ev dizinine kopyalayip tekrar deneyin." >&2
+        exit 1
+    fi
+
+    # musl once: tamamen statik, sistem kutuphanelerinden bagimsiz.
+    # glibc surumu yedek: bazi sistemlerde musl derlemesi calismayabilir.
+    for tip in musl gnu; do
+        ARSIV="$GOMULU_DIZIN/cpython-$tip.tar.gz"
+        [ -f "$ARSIV" ] || continue
+        echo "Python 3 hazirlaniyor ($tip)... ilk calistirmada bir defa yapilir."
+        rm -rf "$HEDEF/python" 2>/dev/null
+        if tar xzf "$ARSIV" -C "$HEDEF" 2>/dev/null; then
+            if python_uygun_mu "$HEDEF/python/bin/python3"; then
+                PY="$HEDEF/python/bin/python3"
+                echo "Hazir: $PY"
+                break
+            fi
+            bilgi "$tip derlemesi bu sistemde calismadi, digeri deneniyor"
+        fi
+        rm -rf "$HEDEF/python" 2>/dev/null
+    done
+fi
+
+# --- 4) Hicbiri olmadi ---------------------------------------------------
 if [ -z "$PY" ]; then
     echo "============================================================" >&2
-    echo " HATA: Python 3.7 veya uzeri bulunamadi." >&2
+    echo " HATA: Calisir bir Python 3 bulunamadi." >&2
     echo "" >&2
-    echo " Bu program calismak icin Python 3 gerektirir." >&2
-    echo " Once su komutu calistirip sonucu inceleyin:" >&2
+    echo " Sistemde python3 yok ve pakete gomulu Python da bu makinede" >&2
+    echo " calismadi. Su komutu calistirip ciktisini gonderin:" >&2
     echo "     sh kurulum/kesif.sh" >&2
     echo "============================================================" >&2
     exit 1
+fi
+
+if [ "$BILGI_MODU" = "1" ]; then
+    echo "Kullanilacak Python: $PY"
+    "$PY" --version
+    echo "Program klasoru    : $KLASOR"
+    exit 0
 fi
 
 exec "$PY" -m cnclog "$@"

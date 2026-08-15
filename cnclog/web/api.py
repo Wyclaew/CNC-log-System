@@ -89,17 +89,20 @@ class Api:
 
         try:
             size = os.path.getsize(path)
-            with open(path, "r", encoding="utf-8", errors="replace") as handle:
+            # Binary mode on purpose: seeking to an arbitrary byte offset is
+            # only defined for binary streams, and a text-mode seek could land
+            # mid-character in a Turkish word and corrupt the decode.
+            with open(path, "rb") as handle:
                 if size > _TAIL_BYTES:
                     handle.seek(size - _TAIL_BYTES)
                     handle.readline()  # drop the partial first line
-                lines = handle.readlines()
+                raw = handle.read()
+            lines = raw.decode("utf-8", errors="replace").splitlines()
         except OSError:
             return []
 
         rows: List[Dict[str, Any]] = []
         for line in lines:
-            line = line.rstrip("\n")
             if not line or line.startswith("#"):
                 continue
             parsed = _parse_line(line)

@@ -36,6 +36,10 @@ except ImportError:  # pragma: no cover
 
 SCHEMA_VERSION = "1"
 
+#: Longest message written on one log line, so a stray blob cannot make the
+#: file unreadable in a terminal.
+_MAX_MESSAGE = 300
+
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS meta (
     key   TEXT PRIMARY KEY,
@@ -443,19 +447,34 @@ class TextLog:
         self._current_date: Optional[str] = None
         self._handle = None
         self._last_ts = 0.0
+        #: Counts writes lost to disk-full / permission errors, so the UI can
+        #: say so instead of the log silently going quiet.
+        self.write_errors = 0
+        self.last_error: Optional[str] = None
 
     def _handle_for(self, ts: float):
+        """Open (or roll over to) today's file. Returns None if it cannot."""
         date_str = datetime.fromtimestamp(ts).strftime("%Y-%m-%d")
         if date_str != self._current_date:
             if self._handle is not None:
-                self._handle.close()
+                try:
+                    self._handle.close()
+                except OSError:
+                    pass
+                self._handle = None
             path = os.path.join(self.log_dir, f"{date_str}.log")
-            is_new = not os.path.isfile(path) or os.path.getsize(path) == 0
-            self._handle = open(path, "a", encoding="utf-8")
-            if is_new:
-                self._handle.write(
-                    self.HEADER.format(machine=self.machine_name, date=date_str)
-                )
+            try:
+                is_new = not os.path.isfile(path) or os.path.getsize(path) == 0
+                handle = open(path, "a", encoding="utf-8")
+                if is_new:
+                    handle.write(
+                        self.HEADER.format(machine=self.machine_name, date=date_str)
+                    )
+            except OSError as exc:
+                self.write_errors += 1
+                self.last_error = str(exc)
+                return None
+            self._handle = handle
             self._current_date = date_str
         return self._handle
 
@@ -467,6 +486,14 @@ class TextLog:
         would make it unreadable, so such a line is placed at the current
         position and the real timestamp is stated in the text instead.
         """
+        # One event, one line. A driver error can be several lines of advice,
+        # and pasting it in raw would break the fixed-column layout the whole
+        # file depends on -- the web view parses by position and would drop
+        # every continuation line.
+        message = " ".join(str(message).split())
+        if len(message) > _MAX_MESSAGE:
+            message = message[: _MAX_MESSAGE - 1] + "…"
+
         with self._lock:
             if ts < self._last_ts:
                 real = datetime.fromtimestamp(ts).strftime("%H:%M:%S")
@@ -474,13 +501,21 @@ class TextLog:
                 ts = self._last_ts
             handle = self._handle_for(ts)
             self._last_ts = ts
+            if handle is None:
+                return  # Already counted in write_errors.
             clock = datetime.fromtimestamp(ts).strftime("%H:%M:%S")
             # Fixed columns: clock [0:8], tag [10:22], message from [22].
             # The web UI parses by position, so the widest label
             # ("BAĞLANTI YOK", 12 chars) has to fit without pushing the
             # message column around.
-            handle.write(f"{clock}  {tag:<12}  {message}\n")
-            handle.flush()
+            try:
+                handle.write(f"{clock}  {tag:<12}  {message}\n")
+                handle.flush()
+            except OSError as exc:
+                # A full disk must not stop data collection: the database is
+                # the record of truth, this file is the readable copy.
+                self.write_errors += 1
+                self.last_error = str(exc)
 
     # -- convenience writers -------------------------------------------------
 

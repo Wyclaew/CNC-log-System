@@ -104,6 +104,22 @@ class TestRoundTrip(unittest.TestCase):
         self.assertIn("—", message)
         self.assertNotIn("F=     0", message)
 
+    def test_multiline_message_collapses_to_one_line(self):
+        """Driver errors span several lines; the log must stay one row per event."""
+        self.log.write(TS, "BAĞLANTI YOK", "Bulunamadı.\nKontrol edin:\n  - kablo")
+        lines = self.lines()
+        self.assertEqual(len(lines), 1, "çok satırlı mesaj log formatını bozdu")
+        clock, tag, message = _parse_line(lines[0])
+        self.assertEqual(tag, "BAĞLANTI YOK")
+        self.assertNotIn("\n", message)
+        self.assertIn("kablo", message)
+
+    def test_absurdly_long_message_is_trimmed(self):
+        self.log.write(TS, "ALARM", "x" * 5000)
+        message = _parse_line(self.lines()[0])[2]
+        self.assertLess(len(message), 400)
+        self.assertTrue(message.endswith("…"))
+
     def test_header_lines_are_skipped_by_parser(self):
         self.log.write(TS, "ALARM", "x")
         path = os.path.join(self.tmp, "2026-03-10.log")

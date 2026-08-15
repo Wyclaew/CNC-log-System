@@ -69,6 +69,10 @@ class Collector:
         self._last_raw_state: Optional[MachineState] = None
         self._started_at = time.time()
         self._tick_count = 0
+        self.internal_errors = 0
+        self.last_internal_error: Optional[str] = None
+        #: False if the collector thread would not stop in time on shutdown.
+        self.stopped_cleanly = True
 
     # ---------------------------------------------------------------- lifecycle
 
@@ -76,16 +80,32 @@ class Collector:
         if self._thread is not None:
             return
         self._stop.clear()
+        # Let a driver that does slow work in connect() (the auto driver sweeps
+        # the subnet) bail out as soon as we are shutting down.
+        if hasattr(self.driver, "should_continue"):
+            self.driver.should_continue = lambda: not self._stop.is_set()
         self._thread = threading.Thread(
             target=self._loop, name="cnclog-collector", daemon=True
         )
         self._thread.start()
 
-    def stop(self, timeout: float = 5.0) -> None:
+    def stop(self, timeout: float = 15.0) -> None:
+        """Stop collecting and close every open event.
+
+        The timeout is generous because a tick can be inside a driver call.
+        Finalizing while the thread is still writing would corrupt the very
+        durations we are trying to close out, so if it will not stop we leave
+        the events open -- the next start repairs them -- rather than race it.
+        """
         self._stop.set()
         if self._thread is not None:
             self._thread.join(timeout=timeout)
+            if self._thread.is_alive():
+                self.stopped_cleanly = False
+                self._thread = None
+                return
             self._thread = None
+        self.stopped_cleanly = True
         self._finalize()
 
     def _finalize(self) -> None:
@@ -191,10 +211,21 @@ class Collector:
         return offline_snapshot(ts, reason)
 
     def _note_internal_error(self, exc: Exception) -> None:
-        """An unexpected bug in our own code: log it, do not stop collecting."""
-        self.text_log.write(
-            time.time(), "HATA", f"İç hata: {type(exc).__name__}: {exc}"
-        )
+        """An unexpected bug in our own code: log it, do not stop collecting.
+
+        Wrapped in its own guard because this runs from the loop's last-resort
+        handler. If writing the error also failed, the exception would escape
+        the loop and kill the collector thread -- recording would stop silently,
+        which is the one outcome worse than the original bug.
+        """
+        self.internal_errors += 1
+        self.last_internal_error = f"{type(exc).__name__}: {exc}"
+        try:
+            self.text_log.write(
+                time.time(), "HATA", f"İç hata: {self.last_internal_error}"
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
     # ------------------------------------------------------------------ logging
 
@@ -287,6 +318,12 @@ class Collector:
             "sample_interval_s": self.cfg.sample_interval_s,
             "storage_backend": getattr(self.storage, "backend", "?"),
         }
+
+        # While the auto driver is still hunting for the control, show what it
+        # is doing instead of a bare "BAĞLANTI YOK".
+        arama = getattr(self.driver, "progress", None)
+        if arama:
+            payload["arama"] = list(arama)
         if snap:
             payload.update(
                 {

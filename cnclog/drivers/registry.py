@@ -12,6 +12,7 @@ from .base import Driver, DriverError
 
 #: config name -> (module, class). Kept as strings for the deferred import.
 _DRIVERS: Dict[str, tuple] = {
+    "auto": (".auto", "AutoDriver"),
     "simulator": (".simulator", "SimulatorDriver"),
     "heidenhain_lsv2": (".heidenhain_lsv2", "HeidenhainLsv2Driver"),
     "heidenhain_opcua": (".heidenhain_opcua", "HeidenhainOpcUaDriver"),
@@ -19,8 +20,9 @@ _DRIVERS: Dict[str, tuple] = {
 
 #: Turkish descriptions used in error messages and in the UI.
 DRIVER_LABELS: Dict[str, str] = {
-    "simulator": "Simülatör (sahte tezgah — test ve demo için)",
-    "heidenhain_lsv2": "Heidenhain LSV2 (TNC 640, ücretsiz pyLSV2 üzerinden)",
+    "auto": "Otomatik — tezgahı ağda kendi bulur (varsayılan)",
+    "simulator": "Simülatör (sahte tezgah — sadece deneme için)",
+    "heidenhain_lsv2": "Heidenhain LSV2 (TNC 640, adres elle verilir)",
     "heidenhain_opcua": "Heidenhain OPC UA NC Server (Opsiyon 56 gerekir)",
 }
 

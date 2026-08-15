@@ -34,46 +34,70 @@ class Application:
         ensure_dir(cfg.data_path)
 
         self.lock: Optional[InstanceLock] = None
-        if writer:
-            self.lock = InstanceLock(os.path.join(cfg.data_path, "cnclog.lock"))
-            self.lock.acquire()  # raises AlreadyRunning
-
-        self.storage: Any = open_storage(cfg.db_path, cfg.data_path)
-        self.text_log = TextLog(cfg.log_dir, cfg.machine_name)
+        self.storage: Any = None
+        self.text_log: Optional[TextLog] = None
         self.recovered_events = 0
 
-        if writer:
-            # Holding the lock proves no other collector is writing, so any
-            # event still open belongs to a run that was killed.
-            self.recovered_events = self.storage.close_dangling_events()
-            if self.recovered_events:
-                self.text_log.write(
-                    time.time(),
-                    "BAKIM",
-                    f"Önceki oturum düzgün kapanmamış: {self.recovered_events} "
-                    "açık kayıt, son ölçüm zamanıyla kapatıldı",
-                )
+        # Anything that fails after the lock is taken has to give it back.
+        # A leaked lock file would keep the next start from ever succeeding.
+        try:
+            if writer:
+                self.lock = InstanceLock(os.path.join(cfg.data_path, "cnclog.lock"))
+                self.lock.acquire()  # raises AlreadyRunning
 
-        self.collector = Collector(cfg, driver, self.storage, self.text_log)
+            self.storage = open_storage(cfg.db_path, cfg.data_path)
+            self.text_log = TextLog(cfg.log_dir, cfg.machine_name)
+
+            if writer:
+                # Holding the lock proves no other collector is writing, so any
+                # event still open belongs to a run that was killed.
+                self.recovered_events = self.storage.close_dangling_events()
+                if self.recovered_events:
+                    self.text_log.write(
+                        time.time(),
+                        "BAKIM",
+                        f"Önceki oturum düzgün kapanmamış: {self.recovered_events} "
+                        "açık kayıt, son ölçüm zamanıyla kapatıldı",
+                    )
+
+            self.collector = Collector(cfg, driver, self.storage, self.text_log)
+        except BaseException:
+            self._release_resources()
+            raise
+
+    def _release_resources(self) -> None:
+        """Close whatever was opened, in reverse order, swallowing failures."""
+        for closer in (
+            getattr(self.text_log, "close", None),
+            getattr(self.storage, "close", None),
+            getattr(self.lock, "release", None),
+        ):
+            if closer is None:
+                continue
+            try:
+                closer()
+            except Exception:  # noqa: BLE001 - teardown must not mask the cause
+                pass
+        self.text_log = None
+        self.storage = None
+        self.lock = None
 
     def start(self) -> None:
         self.collector.start()
 
     def stop(self) -> None:
         self.collector.stop()
-        self.text_log.close()
-        self.storage.close()
-        if self.lock is not None:
-            self.lock.release()
-            self.lock = None
+        if not self.collector.stopped_cleanly:
+            # The collector thread is still running somewhere. Closing the
+            # database under it would only produce errors on the way out; it is
+            # a daemon thread, so process exit cleans everything up and the
+            # open events get repaired on the next start.
+            return
+        self._release_resources()
 
     def close_readonly(self) -> None:
         """Tear down without touching the collector (report / test modes)."""
-        self.text_log.close()
-        self.storage.close()
-        if self.lock is not None:
-            self.lock.release()
-            self.lock = None
+        self._release_resources()
 
 
 def build_application(

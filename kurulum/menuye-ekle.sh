@@ -7,7 +7,11 @@
 # Yaptigi tek sey bir .desktop dosyasi olusturmaktir. Sisteme baska hicbir
 # degisiklik yapmaz.
 
-KLASOR=$(cd "$(dirname "$0")/.." 2>/dev/null && pwd)
+case "$0" in
+    */*) BETIK_DIZIN="${0%/*}" ;;
+    *)   BETIK_DIZIN="." ;;
+esac
+KLASOR=$(cd "$BETIK_DIZIN/.." 2>/dev/null && pwd)
 HEDEF="$HOME/.local/share/applications/cnclog.desktop"
 MASAUSTU_DIZIN=$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Desktop")
 MASAUSTU="$MASAUSTU_DIZIN/cnclog.desktop"
@@ -26,7 +30,7 @@ if [ ! -f "$KLASOR/baslat.sh" ]; then
 fi
 chmod +x "$KLASOR/baslat.sh" 2>/dev/null
 
-mkdir -p "$(dirname "$HEDEF")" || exit 1
+mkdir -p "${HEDEF%/*}" || exit 1
 
 # .desktop sablonundaki ornek yollari gercek klasorle degistir.
 sed -e "s|^Exec=.*|Exec=$KLASOR/baslat.sh|" \

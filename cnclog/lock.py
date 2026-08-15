@@ -32,14 +32,24 @@ class InstanceLock:
     def __init__(self, path: str) -> None:
         self.path = path
         self._handle = None
+        #: Set when the lock file itself could not be created (read-only media).
+        self.unavailable_reason: Optional[str] = None
 
     def acquire(self) -> None:
         if not HAVE_FCNTL:
             # Without flock we cannot guarantee exclusivity; running is still
             # better than refusing to start on a platform we do not target.
             return
-        os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
-        handle = open(self.path, "a+", encoding="utf-8")
+        try:
+            os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
+            handle = open(self.path, "a+", encoding="utf-8")
+        except OSError as exc:
+            # Read-only media or a permissions problem. Without a lock we
+            # cannot guarantee exclusivity, but refusing to run would be worse
+            # than a small risk on a machine that only ever runs one copy.
+            self._handle = None
+            self.unavailable_reason = str(exc)
+            return
         try:
             fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         except OSError:

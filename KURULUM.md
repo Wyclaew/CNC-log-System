@@ -1,63 +1,156 @@
-# CNC Log System — Kurulum ve Kullanım Rehberi
+# CNC Log System — Kurulum Rehberi
 
 Heidenhain TNC 640 kontrollü tezgahın çalışma verilerini otomatik kaydeden,
 duruşları ve alarmları tutan, gün/vardiya raporu çıkaran bir program.
 
-**Tek cümlelik özet:** Klasörü kopyalayın, `./baslat.sh` yazın, tarayıcıda açılır.
-Kurulum, paket indirme, internet gerekmez.
+> **Günlük kullanım için → [KULLANIM.md](KULLANIM.md)**
+> Bu dosya kurulum içindir; operatörün okuması gereken belge diğeridir.
+
+**Özet:** USB'yi tak, klasörü kopyala, `sh baslat.sh` yaz. Kurulum yok, paket
+indirme yok, internet gerekmez. Program tezgahı ağda kendisi bulur.
 
 ---
 
-## İçindekiler
+## 1. Bu tezgah hakkında bilinenler
 
-1. [Önce bunu okuyun — programın sınırları](#1-önce-bunu-okuyun--programın-sınırları)
-2. [Adım 0: Keşif betiği](#2-adım-0-keşif-betiği--en-önce-bunu-çalıştırın)
-3. [Kurulum](#3-kurulum)
-4. [İlk deneme — simülatörle](#4-i̇lk-deneme--simülatörle)
-5. [Gerçek tezgaha bağlanma](#5-gerçek-tezgaha-bağlanma)
-6. [Arayüzün kullanımı](#6-arayüzün-kullanımı)
-7. [Ayarlar (config.ini)](#7-ayarlar-configini)
-8. [Otomatik başlatma](#8-otomatik-başlatma)
-9. [Tezgah ekranından bakmak](#9-tezgah-ekranından-bakmak-opsiyon-133)
-10. [Veriler nerede, nasıl yedeklenir](#10-veriler-nerede-nasıl-yedeklenir)
-11. [Sorun giderme](#11-sorun-giderme)
-12. [Sık sorulan sorular](#12-sık-sorulan-sorular)
+Gönderilen ekran görüntüleri ve videodan doğrulananlar:
+
+| Konu | Durum |
+|---|---|
+| Kontrol | Heidenhain TNC 640, FPT tezgah, 5 eksen (X/Y/Z/C/A) |
+| İşletim sistemi | HEROS, **masaüstü ortamı XFCE** |
+| Terminal | **Var** — HEROS menüsü altından açılıyor |
+| Web tarayıcı | **Var** — QupZilla (Tools menüsünde) |
+| Remote Desktop Manager | **Var** (Opsiyon 133 lisanslı) |
+| Sistem Python | **2.7.15** — program Python 3 ister, bkz. aşağısı |
+| İnternet | **Yok** |
+
+### Python 2.7 sorunu ve çözümü
+
+Tezgahtaki `python` komutu **2.7.15** sürümünü veriyor. Bu program Python 3
+gerektiriyor ve Heidenhain'e bağlanmak için kullanılan pyLSV2 kütüphanesi de
+Python 3.5+ istiyor — yani Python 2.7 ile çalışması mümkün değil.
+
+**Çözüm pakete dahil:** `cnclog/vendor/python-linux/` içinde **taşınabilir bir
+Python 3.11** geliyor (statik derlenmiş, hiçbir sistem kütüphanesine bağımlı
+değil). Sisteme **hiçbir şey kurulmaz**; arşiv sadece bir klasöre açılır ve
+oradan çalıştırılır. HEROS'un SELinux koruması etkilenmez.
+
+`baslat.sh` sırayla dener:
+
+1. Sistemde `python3` var mı ve 3.7+ mı? → onu kullanır
+   *(videoda sadece `python` denenmişti; `python3` da kurulu olabilir)*
+2. Daha önce açılmış gömülü Python var mı? → onu kullanır
+3. Yoksa arşivi açar (ilk çalıştırmada bir defa, ~10 saniye) → kullanır
+
+Hiçbiri olmazsa net bir hata verir, sessizce yarım çalışmaz.
 
 ---
 
-## 1. Önce bunu okuyun — programın sınırları
+## 2. Kurulum
 
-Bu bölüm sizi zaman kaybından kurtarır. Lütfen atlamayın.
+### 2.1 USB'ye hazırlama (bunu siz yapın)
 
-### Program tezgaha hiçbir şey yazmaz
+Program klasörünün **tamamını** USB'ye kopyalayın. Klasör yaklaşık 61 MB'tır
+(çoğu gömülü Python).
 
-Program yalnızca **okur**. Kod içinde tezgaha veri gönderen, dosya aktaran,
-tuş basan, parametre değiştiren **hiçbir fonksiyon yoktur**. Üretimdeki bir
-tezgaha bağlanmanın ön şartı budur.
+```
+CNC log System/
+├── baslat.sh          ← çalıştırılacak dosya
+├── KULLANIM.md
+├── KURULUM.md
+├── cnclog/            ← program
+├── kurulum/
+└── config.ornek.ini
+```
 
-### Kontrol ünitesinin içine kurulum büyük olasılıkla mümkün değil
+### 2.2 Tezgahta (abinizin yapacağı)
 
-TNC 640'ın işletim sistemi **HEROS**, SELinux ile kilitlidir. Heidenhain'in
-kendi kılavuzu, sistem dosyalarının yalnızca izin verilmiş programlarca
-değiştirilebildiğini yazar. Pratikte:
+1. USB'yi tak. HEROS'ta dosya yöneticisi: **Menü → Tools → File Manager**
 
-- root erişiminiz yoktur,
-- paket kuramazsınız,
-- kendi programınızı kurmak engellenir ve servis bunu garanti dışı sayar.
+2. Klasörü USB'den **ev dizinine kopyala**. Masaüstüne veya `~/cnclog` olur.
 
-**Bu program o kısıtı hesaba katarak yazıldı:** hiçbir şey kurmaz, hiçbir paket
-indirmez. HEROS'ta Python varsa ve çalıştırmaya izin veriliyorsa doğrudan orada
-çalışır. Verilmiyorsa — ki muhtemel olan bu — **tezgahın yanındaki ayrı bir
-Linux bilgisayarda** çalıştırın ve tezgaha ağ üzerinden bağlanın. Aynı kod, tek
-fark nereye kopyaladığınız. Tezgah ekranından bakmak için
-[9. bölüme](#9-tezgah-ekranından-bakmak-opsiyon-133) bakın.
+   > **Neden kopyalamak gerekiyor:** USB genelde "çalıştırma yasak" (noexec)
+   > olarak bağlanır ve program oradan çalışmaz. Ayrıca USB'yi çıkarınca kayıt
+   > durur. Kopyalayın.
 
-Hangisinin geçerli olduğunu [keşif betiği](#2-adım-0-keşif-betiği--en-önce-bunu-çalıştırın)
-söyleyecek.
+3. Terminali aç: **Menü → Tools → Terminal**
+   *(videodaki gibi; `user ~/Desktop $` yazan pencere)*
 
-### Gerçek F ve S değerleri için ek lisans gerekir
+4. Klasöre gir ve çalıştır:
 
-Bu önemli, çünkü beklentiyi doğru kurmak lazım:
+```bash
+cd ~/Desktop/cnclog
+sh baslat.sh
+```
+
+`sh baslat.sh` şeklinde yazın — `./baslat.sh` çalıştırma izni ister, `sh` ile
+başlatmak buna gerek bırakmaz.
+
+İlk çalıştırmada şunu görürsünüz:
+
+```
+Python 3 hazirlaniyor (musl)... ilk calistirmada bir defa yapilir.
+Hazir: /home/user/Desktop/cnclog/cnclog/vendor/python-linux/rt/python/bin/python3
+==============================================================
+ CNC Log System 1.0.0 — Heidenhain TNC 640 (TEZGAH-01)
+==============================================================
+ ...
+ Arayüz     : http://127.0.0.1:8760
+==============================================================
+ Kayıt başladı. Durdurmak için Ctrl+C.
+```
+
+Tarayıcı (QupZilla) kendiliğinden açılır. Açılmazsa **Menü → Tools → QupZilla**
+ile açıp adres satırına `127.0.0.1:8760` yazın.
+
+---
+
+## 3. Tezgaha bağlanma
+
+**IP adresi girmenize gerek yok.** Program açılınca tezgahı kendisi arar:
+
+1. `config.ini` içinde adres yazıyorsa önce onu dener
+2. Sonra bu bilgisayarın kendisini (`127.0.0.1`) — program HEROS'ta çalışıyorsa
+   kontrol zaten burada
+3. Sonra aynı ağdaki diğer adresleri (253 adres, ~3 saniye)
+
+Bulduğunda otomatik bağlanır. Bulamazsa **BAĞLANTI YOK** olarak kaydeder ve
+aramaya devam eder — **asla sahte veri üretmez**.
+
+Aramayı ayrıca çalıştırıp sonucu görmek için:
+
+```bash
+sh baslat.sh --tara
+```
+
+Bağlantıyı test etmek, hangi verilerin okunabildiğini görmek için:
+
+```bash
+sh baslat.sh --test-baglanti
+```
+
+Bu komut tezgaha **hiçbir şey yazmaz**, tek bir okuma yapar ve çıkar. Çıktının
+sonunda "Tezgaha hiçbir şey yazılmadı" yazar.
+
+### Adresi sabitlemek (isteğe bağlı, aramayı hızlandırır)
+
+```bash
+cp config.ornek.ini config.ini
+```
+
+Sonra `config.ini` içinde:
+
+```ini
+[surucu]
+tnc_ip = 192.168.1.50
+```
+
+---
+
+## 4. Neyin okunabildiği, neyin okunamadığı
+
+Bu tabloyu bilmek beklentiyi doğru kurar:
 
 | Veri | LSV2 (ücretsiz) | OPC UA (Opsiyon 56) |
 |---|:---:|:---:|
@@ -69,431 +162,140 @@ Bu önemli, çünkü beklentiyi doğru kurmak lazım:
 | **Gerçek ilerleme (mm/dk)** | ❌ | ✅ |
 | **Gerçek devir (dev/dk)** | ❌ | ✅ |
 
-LSV2 protokolü gerçek F ve S değerlerini **hiçbir tezgahta** vermez; sadece
-override yüzdesini verir. Bu programın eksiği değil, protokolün sınırı.
+LSV2 protokolü gerçek F ve S değerlerini **hiçbir tezgahta** vermez — bu
+programın eksiği değil, protokolün sınırı. Okunamayan alanlar `—` görünür ve
+**program tam olarak çalışmaya devam eder**.
 
-Okunamayan alanlar arayüzde ve logda `—` görünür. **Program yine tam olarak
-çalışır** — duruş takibi, alarmlar, süreler, raporlar hepsi çalışır.
+> **Neden PLC'den okumuyoruz:** Teknik olarak mümkün ama `PLCDEBUG` erişimi
+> gerekiyor; o da şifreli ve PLC'ye **yazma** yetkisi açıyor. "Tezgaha hiçbir
+> şey yazmaz" güvencesi iki sayıdan değerli. Gerçek F/S istiyorsanız doğru yol
+> Opsiyon 56'dır.
 
-> PLC hafızasından gerçek F/S okumak teknik olarak mümkün ama **bilerek
-> yapılmadı**: o yöntem `PLCDEBUG` erişimi ister, o da şifrelidir ve PLC'ye
-> **yazma** yetkisi de açar. "Tezgaha hiçbir şey yazmaz" güvencesi iki sayıdan
-> daha değerli.
+**LSV2 için tezgahta DNC opsiyonu (Opsiyon 18) gerekebilir.** Yoksa program
+bağlanır ama veri okuyamaz — ve size bunu net bir mesajla söyler.
 
-### LSV2 için tezgahta DNC opsiyonu gerekebilir
-
-Veri okuyan tüm fonksiyonlar `DNC` yetkisiyle çalışır; bu genelde **Opsiyon 18
-(DNC)** lisansını gerektirir. Lisans yoksa program bağlanır ama veri okuyamaz —
-ve size bunu net bir mesajla söyler, sessizce boş kayıt tutmaz.
+Tezgahta hangi opsiyonların lisanslı olduğunu görmek için: TNC ekranında
+**MOD** tuşuna basıp listeye bakın (18 = DNC, 56 = OPC UA, 133 = Remote Desktop).
 
 ---
 
-## 2. Adım 0: Keşif betiği — en önce bunu çalıştırın
+## 5. Sürekli çalışması için
 
-Bu betik **hiçbir şeyi değiştirmez**, sadece bakar ve rapor yazar. Hangi
-kurulum yolunun geçerli olduğunu bu belirler.
-
-Tezgahta veya tezgahın yanındaki bilgisayarda:
-
-```bash
-sh kurulum/kesif.sh
-```
-
-Tezgahın IP adresini biliyorsanız ağ testini de yapsın:
-
-```bash
-sh kurulum/kesif.sh 192.168.1.50
-```
-
-Çıktının **tamamını** kopyalayıp saklayın. Şunları söyler:
-
-- İşletim sistemi ve masaüstü ortamı — gerçekten XFCE mi, yoksa HEROS mu
-- Python var mı, sürümü yeterli mi, `sqlite3` modülü derlenmiş mi
-- Dosya yazma izniniz var mı
-- Tezgahın **19000** (LSV2) ve **4840** (OPC UA) portları açık mı
-- SELinux açık mı
-
-Betiğin göremediği, **tezgah ekranından bakmanız gereken** tek şey lisanslı
-opsiyonlar. TNC ekranında **MOD** tuşuna basıp listeye bakın:
-
-| Opsiyon | Adı | Ne işe yarar |
-|---|---|---|
-| **18** | DNC | LSV2 ile veri okumak için gerekli |
-| **56** | OPC UA NC Server | Gerçek F/S değerleri için |
-| **133** | Remote Desktop Manager | Tezgah ekranından programa bakmak için |
-
----
-
-## 3. Kurulum
-
-Kurulum diye bir şey yok — **klasörü kopyalayın, bitti.**
-
-1. Program klasörünü USB veya ağ üzerinden bilgisayara kopyalayın.
-   Örnek hedef: `/home/operator/cnclog`
-
-2. Başlatıcıya çalıştırma izni verin:
-
-```bash
-chmod +x baslat.sh kurulum/*.sh
-```
-
-3. Çalıştırın:
-
-```bash
-./baslat.sh
-```
-
-Bu kadar. Program açılır, tarayıcıda arayüz gelir, kayıt başlar.
-
-**Gereken tek şey Python 3.7 veya üzeridir.** Başka hiçbir paket, kütüphane
-veya internet bağlantısı gerekmez. Kullanılan tek dış kütüphane olan pyLSV2
-program klasörünün içinde gelir (`cnclog/vendor/pyLSV2`, MIT lisanslı).
-
----
-
-## 4. İlk deneme — simülatörle
-
-**Tezgaha hiç bağlanmadan** programın nasıl çalıştığını görün. Bu tamamen
-güvenlidir; sahte bir tezgah simüle edilir.
-
-```bash
-./baslat.sh --surucu simulator
-```
-
-Tarayıcı açılır, loglar akmaya başlar. Kapatmak için terminalde **Ctrl+C**.
-
-Hızlandırılmış deneme — 1 saatlik vardiyayı 1 dakikada oynatır:
-
-```bash
-./baslat.sh --surucu simulator --sim-hiz 60
-```
-
-Simülatör kasten zor durumları üretir: parça değişimi duruşları, eşiğin altında
-kalan kısa duraklamalar, alarmlar, kopan bağlantı. Böylece programın bunları
-doğru ayırdığını kendiniz görebilirsiniz.
-
-Denemeden sonra raporu görün:
-
-```bash
-./baslat.sh --rapor bugun
-```
-
-> **Not:** Deneme verilerini gerçek verilerden ayırmak isterseniz
-> `--dizin /tmp/deneme` ekleyin; kayıtlar oraya yazılır.
-
----
-
-## 5. Gerçek tezgaha bağlanma
-
-### 5.1 Önce bağlantıyı test edin
-
-Kayıt tutmadan, sadece tek bir okuma yapıp sonucu gösterir:
-
-```bash
-./baslat.sh --surucu heidenhain_lsv2 --test-baglanti
-```
-
-Bu komut size şunları söyler:
-
-- Bağlantı kuruldu mu
-- Tezgahtan hangi alanlar okunabiliyor, hangileri okunamıyor
-- LSV2 yeteneklerinin tek tek listesi (program durumu, alarm, takım…)
-
-Başarılıysa şuna benzer bir çıktı alırsınız:
-
-```
-Bağlantı kuruldu. Tek okuma yapılıyor…
-
-  Çalışma durumu (ham)  : running
-  Türetilen durum       : ÇALIŞIYOR
-  İlerleme F (mm/dk)    : —
-  Devir S (dev/dk)      : —
-  F override (%)        : 100
-  Program               : PARCA_12.H
-  ...
-  LSV2 okuma yetenekleri (bu tezgahta):
-    Program durumu            : evet
-    Hata/alarm mesajları      : evet
-    ...
-```
-
-`F` ve `S` yanında `—` görmeniz normaldir — [1. bölümdeki tabloya](#gerçek-f-ve-s-değerleri-için-ek-lisans-gerekir)
-bakın.
-
-### 5.2 Ayarları yazın
-
-```bash
-cp config.ornek.ini config.ini
-```
-
-`config.ini` içinde en az şunları düzenleyin:
-
-```ini
-[genel]
-makine_id = TEZGAH-01
-makine_adi = DMG Mori / TNC 640
-
-[surucu]
-tip = heidenhain_lsv2
-tnc_ip = 192.168.1.50
-```
-
-### 5.3 Çalıştırın
-
-```bash
-./baslat.sh
-```
-
-### 5.4 OPC UA kullanacaksanız (Opsiyon 56 varsa)
-
-Gerçek F/S değerlerini istiyorsanız ve tezgahta Opsiyon 56 lisanslıysa:
-
-```bash
-pip3 install asyncua
-./baslat.sh --surucu heidenhain_opcua --test-baglanti
-```
-
-Bu komut sunucudaki değişkenleri tarayıp node kimliklerini listeler. İlgili
-olanları `config.ini` içindeki `[opcua]` bölümüne yazın, sonra `tip =
-heidenhain_opcua` yapın.
-
-> **Dürüst uyarı:** OPC UA sürücüsü gerçek bir lisanslı tezgahta test
-> edilemedi (elimizde öyle bir makine yoktu). Node kimlikleri tezgahtan
-> tezgaha değişir, o yüzden elle yapılandırılır. LSV2 sürücüsü ise
-> tamamlanmış ve mantığı test edilmiştir.
-
----
-
-## 6. Arayüzün kullanımı
-
-Arayüz `http://127.0.0.1:8760` adresinde açılır.
-
-### Ana sayfa
-
-- **Büyük durum kartı** — makinenin şu anki hali, renkli:
-  🟢 ÇALIŞIYOR · 🟠 DURUŞ · 🔴 ALARM · 🔵 KURULUM · ⚫ BAĞLANTI YOK
-- **Günün özeti** — çalışma süresi, duruş süresi, kullanılabilirlik %,
-  duruş sayısı, alarm sayısı
-- **Anlık değerler** — F, S, override'lar, program adı, blok no, takım no
-- **Kayıtlar** — solda saat, sağda olay. En yeni üstte, 2 saniyede bir yenilenir.
-  - **Tarih** seçici ile geçmiş günlere bakılır
-  - **Göster** filtresi: sadece duruşlar / sadece alarmlar / sadece programlar
-
-Bir log satırı şöyle okunur:
-
-```
-14:32:07  ÇALIŞIYOR   F=  1250 mm/dk  S=  8000 dev/dk  Prog=PARCA_12.H  N=1240  T=12
-14:33:12  DURUŞ       başladı — program yüklü değil (parça değişimi veya bekleme)
-14:36:41  DURUŞ       bitti — süre 3dk 29sn
-14:41:02  ALARM       [2.15.1024] Soğutma sıvısı basıncı düşük
-```
-
-### Rapor sekmesi
-
-Gün özeti, vardiya kırılımı, program bazlı süreler, en uzun duruşlar, alarm
-listesi. **CSV indir** düğmesi Excel'de açılabilen bir dosya verir (Türkçe
-Excel'de sütunlar doğru ayrılır).
-
-### Terminalden rapor
-
-```bash
-./baslat.sh --rapor bugun
-./baslat.sh --rapor dun
-./baslat.sh --rapor 2026-08-10
-```
-
-Bu komut program çalışırken de kullanılabilir; kaydı bozmaz.
-
----
-
-## 7. Ayarlar (config.ini)
-
-Tüm ayarlar `config.ornek.ini` içinde tek tek açıklanmıştır. En çok
-değiştirilenler:
-
-| Ayar | Ne yapar |
-|---|---|
-| `durus_esigi_sn` | Bir duruşun kayda geçmesi için gereken en az süre. **10** = kısa duraklamalar logu şişirmez. **0** = her duraklama anında kaydedilir. |
-| `ornekleme_araligi_sn` | Kaç saniyede bir ölçüm alınacak (varsayılan 2) |
-| `saklama_gun` | Ayrıntılı ölçümler kaç gün saklanacak (varsayılan 90). **Duruş, alarm ve program kayıtları asla silinmez.** |
-| `bind` | `127.0.0.1` sadece bu bilgisayar; `0.0.0.0` ağdaki herkes (şifre yoktur!) |
-| `baslangiclar` | Vardiya saatleri |
-
-Bozuk bir değer yazarsanız program durmaz, o ayar varsayılanına döner.
-
----
-
-## 8. Otomatik başlatma
-
-### XFCE menüsüne ve masaüstüne kısayol
+### XFCE menüsüne ekleme
 
 ```bash
 sh kurulum/menuye-ekle.sh
 ```
 
-Menüde **CNC Log** olarak görünür. Kaldırmak için `sh kurulum/menuye-ekle.sh --kaldir`.
+Menüde **CNC Log** olarak görünür. HEROS'un XFCE masaüstünde alt-tab ile
+geçiş yapılabilir.
 
-### Bilgisayar açılınca kendiliğinden başlasın (systemd)
-
-Bu yöntem programı arka planda sürekli çalıştırır ve çökerse yeniden başlatır.
-Root gerekmez:
+### Bilgisayar açılınca kendiliğinden başlaması
 
 ```bash
 mkdir -p ~/.config/systemd/user
 cp kurulum/cnclog.service ~/.config/systemd/user/
 ```
 
-Dosyayı açıp `WorkingDirectory` ve `ExecStart` satırlarındaki yolları kendi
-klasörünüze göre düzenleyin, sonra:
+Dosyadaki `WorkingDirectory` ve `ExecStart` yollarını kendi klasörünüze göre
+düzenleyin, sonra:
 
 ```bash
 systemctl --user daemon-reload
 systemctl --user enable --now cnclog
 ```
 
-Durumu görmek için:
+> systemd yoksa veya izin verilmiyorsa: XFCE → **Ayarlar → Oturum ve Başlangıç
+> → Otomatik Başlatılan Uygulamalar** bölümünden `sh /yol/baslat.sh
+> --tarayici-yok` komutunu ekleyin.
 
-```bash
-systemctl --user status cnclog
-journalctl --user -u cnclog -f
+### Ağdaki başka bir bilgisayardan bakmak
+
+`config.ini` içinde:
+
+```ini
+[web]
+bind = 0.0.0.0
 ```
 
-Kimse oturum açmamışken de çalışması için (tezgah başında genelde böyledir):
+Sonra ofisteki bilgisayardan `http://<tezgah-ip>:8760` adresine girin.
 
-```bash
-sudo loginctl enable-linger $USER
-```
-
-> systemd yoksa: XFCE → **Ayarlar → Oturum ve Başlangıç → Otomatik Başlatılan
-> Uygulamalar** bölümünden `baslat.sh --tarayici-yok` komutunu ekleyin.
+> **Uyarı:** Şifre koruması yoktur. Sadece güvendiğiniz bir ağda kullanın.
 
 ---
 
-## 9. Tezgah ekranından bakmak (Opsiyon 133)
+## 6. Veriler nerede
 
-Program tezgahın yanındaki ayrı bir bilgisayarda çalışıyorsa, operatörün
-tezgahtan kalkması gerekmez.
-
-Heidenhain **Remote Desktop Manager (Opsiyon 133)**, ağdaki bir bilgisayarın
-ekranını TNC ekranında gösterir ve **kontrol klavyesindeki bir tuşla** TNC
-ekranı ile o bilgisayar arasında geçiş yaptırır. **VNC ile Linux makineleri de
-destekler.**
-
-Kurulum sırası:
-
-1. Log bilgisayarında bir VNC sunucusu çalıştırın (`x11vnc`, `tigervnc` vb.)
-2. TNC'de **MOD → Remote Desktop Manager** bölümünden yeni bir **VNC**
-   bağlantısı tanımlayın, log bilgisayarının IP'sini girin
-3. Artık tezgah ekranından tek tuşla log ekranına geçilebilir
-
-Opsiyon 133 yoksa daha basit alternatifler:
-
-- Log bilgisayarına küçük bir ikinci ekran bağlamak
-- `config.ini` içinde `bind = 0.0.0.0` yapıp ofisteki bir bilgisayardan
-  tarayıcıyla bakmak *(şifre koruması yoktur — sadece güvendiğiniz ağda)*
-
----
-
-## 10. Veriler nerede, nasıl yedeklenir
-
-Her şey **yerelde**, program klasöründeki `veri/` dizininde durur. Hiçbir veri
-internete veya başka bir yere gönderilmez.
+Her şey **yerelde**, program klasöründeki `veri/` dizininde. Hiçbir veri
+internete veya başka bir yere gönderilmez (zaten internet de yok).
 
 ```
 veri/
 ├── cnclog.db          → veritabanı (ölçümler + olaylar)
 ├── cnclog.lock        → çalışan kopya kilidi (otomatik)
 └── loglar/
-    ├── 2026-08-13.log → günlük metin log (elle okunabilir)
-    └── 2026-08-14.log
+    ├── 2026-08-15.log → günlük metin log (elle okunabilir)
+    └── 2026-08-16.log
 ```
 
-Metin logları herhangi bir metin düzenleyiciyle açabilirsiniz — arayüz zaten bu
-dosyaları gösterir.
-
-**Yedekleme:** `veri/` klasörünü kopyalamak yeterlidir. Program çalışırken bile
+**Yedekleme:** `veri/` klasörünü kopyalayın. Program çalışırken bile
 kopyalanabilir.
 
-```bash
-tar czf cnclog-yedek-$(date +%F).tar.gz veri/
-```
-
-**Yer kaplama:** 2 saniyelik örnekleme ile günde ~40 000 ölçüm satırı, yaklaşık
-5–8 MB. 90 günlük varsayılan saklama ile veritabanı ~500 MB civarında dengelenir.
-Duruş/alarm/program kayıtları çok küçüktür ve hiç silinmez.
+**Yer kaplama:** 2 saniyelik örnekleme ile günde ~5–8 MB. 90 günlük varsayılan
+saklama ile veritabanı ~500 MB civarında dengelenir. Duruş/alarm/program
+kayıtları çok küçüktür ve **hiç silinmez**.
 
 ---
 
-## 11. Sorun giderme
+## 7. Sorun giderme
 
-| Belirti | Sebep ve çözüm |
+| Belirti | Çözüm |
 |---|---|
-| `Python 3.7 veya üzeri bulunamadı` | Bu makinede Python yok. `sh kurulum/kesif.sh` çalıştırıp çıktıya bakın. HEROS'ta ise programı yan bilgisayara kurun. |
-| `Program zaten çalışıyor (PID …)` | İkinci kopya açmaya çalıştınız. Çalışanı kapatın veya `--dizin` ile başka bir klasör verin. Bu koruma kasıtlıdır: iki kopya aynı veriye yazarsa süreler bozulur. |
-| `Tezgaha bağlanılamadı … timed out` | IP yanlış, tezgah kapalı veya ağ erişimi yok. `sh kurulum/kesif.sh <IP>` ile port 19000'i test edin. |
-| `Bağlantı kuruldu ama hiçbir veri okunamıyor` | DNC opsiyonu (Opsiyon 18) lisanslı değil veya LSV2 erişimi kapalı. Tezgah servisinden açılmasını isteyin. |
-| `Web arayüzü başlatılamadı` / port kullanımda | `./baslat.sh --port 8761` ile başka port deneyin. |
-| Arayüzde F ve S sürekli `—` | Normal. LSV2 bu değerleri vermez. Gerçek F/S için Opsiyon 56 + OPC UA sürücüsü gerekir. |
-| Loglarda `BAĞLANTI YOK` çok görünüyor | Ağ kopuyor veya tezgah kapatılıyor. Bu süre **duruş sayılmaz**, raporda ayrı gösterilir. |
-| Duruşlar loglanmıyor | `durus_esigi_sn` çok yüksek olabilir. `0` yapıp deneyin. |
-| Tarayıcı açılmıyor | Sunucu yine çalışıyordur. Tarayıcıyı elle açıp `http://127.0.0.1:8760` yazın. |
-| `Önceki oturum düzgün kapanmamış` | Bilgi mesajıdır, hata değil. Program çökmüş veya elektrik kesilmiş; açık kayıtlar son ölçüm zamanıyla kapatıldı. |
+| `Calisir bir Python 3 bulunamadi` | `sh kurulum/kesif.sh` çalıştırıp çıktıyı gönderin. Gömülü arşiv kopyalanmamış olabilir. |
+| `Python'u acacak yazilabilir bir klasor bulunamadi` | Program klasörü salt-okunur bir yerde (USB). Ev dizinine kopyalayın. |
+| Permission denied | `./baslat.sh` yerine `sh baslat.sh` yazın. |
+| `Program zaten çalışıyor (PID …)` | İkinci kopya açılmaya çalışıldı. Bu koruma kasıtlıdır: iki kopya aynı veriye yazarsa süreler bozulur. |
+| Tezgah bulunamıyor | `sh baslat.sh --tara`. Tezgah açık mı, LSV2/DNC erişimi açık mı kontrol edin. |
+| Bağlanıyor ama veri yok | DNC opsiyonu (18) lisanslı değil veya LSV2 kapalı. Servisten açtırın. |
+| F ve S sürekli `—` | Normal. Bkz. 4. bölüm. |
+| Tarayıcı açılmıyor | Sunucu yine çalışıyor. QupZilla'yı elle açıp `127.0.0.1:8760` yazın. |
+| Port kullanımda | `sh baslat.sh --port 8761` |
+| `Önceki oturum düzgün kapanmamış` | Bilgi mesajı, hata değil. Açık kayıtlar onarıldı, veri kaybı yok. |
 
 Programı durdurmak: terminalde **Ctrl+C**. Açık kayıtlar düzgün kapatılır.
 
 ---
 
-## 12. Sık sorulan sorular
+## 8. Keşif betiği (sorun olursa)
 
-**Tezgaha zarar verir mi?**
-Hayır. Program yalnızca okur; tezgaha veri gönderen hiçbir kod yoktur.
-`--test-baglanti` çıktısı da her seferinde "Tezgaha hiçbir şey yazılmadı" der.
+Bir şey ters giderse, hiçbir şeyi değiştirmeyen bu betik durumu raporlar:
 
-**İnternet gerekiyor mu?**
-Hayır. Hiçbir aşamada. Program hiçbir yere veri göndermez.
+```bash
+sh kurulum/kesif.sh
+```
 
-**Aynı anda birden fazla tezgah izleyebilir miyim?**
-Şu an her tezgah için ayrı bir kopya çalıştırmanız gerekir (`--dizin` ile ayrı
-veri klasörü vererek). Veritabanı ve arayüz `makine_id` alanıyla çoklu tezgaha
-hazırdır; tek arayüzde birden fazla tezgah göstermek sonradan eklenebilir.
+Tezgahın IP'sini biliyorsanız ağ testini de yapar:
 
-**Program çökerse veri kaybolur mu?**
-Her ölçüm anında diske yazılır, bellekte biriktirilmez. Çökme sonrası açık
-kalan kayıtlar bir sonraki açılışta son bilinen ölçüm zamanıyla kapatılır ve
-log dosyasına `BAKIM` satırı düşülür.
+```bash
+sh kurulum/kesif.sh 192.168.1.50
+```
 
-**Duruş süresi neyi kapsıyor?**
-Programın ilerlemediği her an: parça değişimi, bekleme, program durdurma ve
-alarm süreleri. **Bağlantı kopukluğu duruşa dahil değildir** — ölçemediğimiz
-zamanı duruş saymak kullanılabilirlik oranını yanlış gösterirdi.
-
-**"Kullanılabilirlik" nasıl hesaplanıyor?**
-`çalışma süresi ÷ gözlenen süre`. Gözlenen süre = çalışma + duruş + kurulum.
-Bağlantının olmadığı süre paydaya girmez.
-
-**Takım değişimi neden duruş sayılmıyor?**
-Program çalışmaya devam ediyorsa (takım değişimi, bekleme çevrimi) makine
-üretim yapıyor sayılır. Duruş, programın ilerlemediği zamandır. Parça değişimi
-ise program durduğu için duruş olarak kaydedilir — istediğiniz davranış budur.
-
-**Logları başka bir programa aktarabilir miyim?**
-Evet. `veri/cnclog.db` standart bir SQLite veritabanıdır (`samples` ve `events`
-tabloları). Ayrıca arayüzden CSV indirebilir, `veri/loglar/*.log` metin
-dosyalarını doğrudan okuyabilirsiniz.
+Çıktının tamamını kopyalayıp gönderin.
 
 ---
 
 ## Hızlı komut özeti
 
 ```bash
-sh kurulum/kesif.sh 192.168.1.50          # sistemi ve bağlantıyı incele
-./baslat.sh --surucu simulator            # sahte tezgahla dene
-./baslat.sh --surucu simulator --sim-hiz 60   # hızlandırılmış deneme
-./baslat.sh --test-baglanti               # gerçek tezgaha bağlanmayı dene
-./baslat.sh                               # normal çalıştır
-./baslat.sh --web-yok                     # arayüzsüz, sadece kayıt
-./baslat.sh --rapor bugun                 # günün raporunu ekrana bas
-./baslat.sh --port 8761                   # başka port kullan
-./baslat.sh --help                        # tüm seçenekler
-sh kurulum/menuye-ekle.sh                 # XFCE menüsüne ekle
+sh baslat.sh                       # normal çalıştır
+sh baslat.sh --tara                # tezgahı ağda ara
+sh baslat.sh --test-baglanti       # bağlantıyı test et, veri oku, çık
+sh baslat.sh --rapor bugun         # günün raporunu ekrana bas
+sh baslat.sh --web-yok             # arayüzsüz, sadece kayıt
+sh baslat.sh --port 8761           # başka port
+sh baslat.sh --python-bilgi        # hangi Python kullanılıyor
+sh baslat.sh --surucu simulator    # sahte tezgahla dene (sadece deneme!)
+sh baslat.sh --help                # tüm seçenekler
+sh kurulum/menuye-ekle.sh          # XFCE menüsüne ekle
+sh kurulum/kesif.sh                # sistem raporu
 ```

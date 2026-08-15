@@ -76,34 +76,60 @@ fi
 
 # --------------------------------------------------------------- 4. PYTHON
 baslik "4. PYTHON  (program bunu kullanacak)"
-BULUNAN_PY=""
-for py in python3 python3.12 python3.11 python3.10 python3.9 python3.8 python3.7 python; do
-    if command -v "$py" >/dev/null 2>&1; then
-        SURUM=$("$py" -c 'import sys; print("%d.%d.%d" % sys.version_info[:3])' 2>/dev/null)
-        [ -z "$SURUM" ] && continue
-        echo "  $py -> $SURUM   ($(command -v "$py"))"
-        [ -z "$BULUNAN_PY" ] && BULUNAN_PY="$py"
+echo "  Sistemde bulunan Python surumleri:"
+BULUNAN_PY=""      # herhangi bir python, ag testinde kullanilir
+PY3=""             # 3.7+ olan; program bunu ister
+for py in python3 python3.13 python3.12 python3.11 python3.10 python3.9 \
+          python3.8 python3.7 python python2; do
+    command -v "$py" >/dev/null 2>&1 || continue
+    SURUM=$("$py" -c 'import sys; print("%d.%d.%d" % sys.version_info[:3])' 2>/dev/null)
+    [ -z "$SURUM" ] && continue
+    echo "    $py -> $SURUM   ($(command -v "$py"))"
+    [ -z "$BULUNAN_PY" ] && BULUNAN_PY="$py"
+    if [ -z "$PY3" ] && "$py" -c 'import sys; sys.exit(0 if sys.version_info >= (3,7) else 1)' 2>/dev/null; then
+        PY3="$py"
     fi
 done
-if [ -z "$BULUNAN_PY" ]; then
-    echo "  !!! PYTHON BULUNAMADI - program bu makinede calisamaz."
-else
+[ -z "$BULUNAN_PY" ] && echo "    (hicbiri bulunamadi)"
+
+echo
+if [ -n "$PY3" ]; then
+    echo "  SONUC: Python 3.7+ VAR ($PY3) - program dogrudan bunu kullanir."
     echo
-    echo "  Gerekli modul kontrolu ($BULUNAN_PY ile):"
-    for mod in sqlite3 http.server json threading configparser csv fcntl; do
-        if "$BULUNAN_PY" -c "import $mod" 2>/dev/null; then
+    echo "  Gerekli modul kontrolu ($PY3 ile):"
+    for mod in sqlite3 http.server json threading configparser csv fcntl socket; do
+        if "$PY3" -c "import $mod" 2>/dev/null; then
             echo "    $mod : VAR"
         else
             echo "    $mod : YOK  <-- onemli"
         fi
     done
-    echo
-    echo "  Surum yeterli mi (en az 3.7 gerekiyor)?"
-    if "$BULUNAN_PY" -c 'import sys; sys.exit(0 if sys.version_info >= (3,7) else 1)' 2>/dev/null; then
-        echo "    EVET"
+else
+    echo "  SONUC: Sistemde Python 3.7+ YOK (sadece Python 2 var veya hic yok)."
+    echo "         SORUN DEGIL: program kendi tasinabilir Python 3'unu getirir,"
+    echo "         sisteme hicbir sey kurulmaz. Ilk calistirmada bir defa acilir."
+fi
+
+echo
+echo "  Pakete gomulu tasinabilir Python arsivleri:"
+case "$0" in
+    */*) BETIK_DIZIN="${0%/*}" ;;
+    *)   BETIK_DIZIN="." ;;
+esac
+KOK=$(cd "$BETIK_DIZIN/.." 2>/dev/null && pwd)
+GOMULU_VAR=0
+for tip in musl gnu; do
+    A="$KOK/cnclog/vendor/python-linux/cpython-$tip.tar.gz"
+    if [ -f "$A" ]; then
+        echo "    $tip : VAR ($(du -h "$A" 2>/dev/null | cut -f1))"
+        GOMULU_VAR=1
     else
-        echo "    HAYIR - Python 3.7 veya uzeri gerekli"
+        echo "    $tip : yok"
     fi
+done
+if [ "$GOMULU_VAR" = "0" ] && [ -z "$PY3" ]; then
+    echo "    !!! Ne sistemde Python 3 var ne de gomulu arsiv - program calismaz."
+    echo "        Paketin eksiksiz kopyalandigindan emin olun."
 fi
 
 # ---------------------------------------------------------- 5. YAZMA IZNI
@@ -196,9 +222,11 @@ echo "    - TNC ekraninda MOD tusuna basin, lisansli opsiyonlari listeleyin."
 echo "      Ozellikle su numaralar onemli:"
 echo "         Opsiyon 18  = DNC        -> veri okumak icin GEREKLI"
 echo "         Opsiyon 56  = OPC UA     -> gercek F/S degerleri icin"
-echo "         Opsiyon 133 = Remote Desktop Manager"
-echo "                                  -> tezgah ekranindan programa bakmak icin"
+echo "         Opsiyon 133 = Remote Desktop Manager  (bu tezgahta VAR)"
 echo "    - Ag ayarlarinda LSV2 / DNC erisimi acik mi?"
+echo
+echo "  SONRAKI ADIM: tezgahi otomatik aratmak icin"
+echo "      sh baslat.sh --tara"
 echo
 echo "============================================================"
 echo "  RAPOR SONU - bu ciktinin TAMAMINI kopyalayip gonderin"

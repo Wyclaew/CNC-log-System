@@ -70,6 +70,30 @@ def _quiet_pylsv2() -> None:
         logger.propagate = False
 
 
+def close_client(client) -> None:
+    """Close an LSV2 client and make sure its socket really goes away.
+
+    pyLSV2's disconnect() logs out over the network first. On a half-open
+    connection -- which is every failed probe during discovery -- that call
+    raises and the socket close beneath it never runs. Sweeping a /24 would
+    then leak one file descriptor per address. So after the polite close we
+    reach in and shut the socket regardless.
+    """
+    if client is None:
+        return
+    try:
+        client.disconnect()
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        low_level = getattr(client, "_llcom", None)
+        sock = getattr(low_level, "_tcpsock", None)
+        if sock is not None:
+            sock.close()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def _load_pylsv2():
     """Prefer the bundled copy, fall back to a system-installed one."""
     try:
@@ -123,6 +147,7 @@ class HeidenhainLsv2Driver(Driver):
 
         _quiet_pylsv2()
 
+        client = None
         try:
             client = self._lsv2.LSV2(
                 self.cfg.tnc_ip,
@@ -132,6 +157,9 @@ class HeidenhainLsv2Driver(Driver):
             )
             client.connect()
         except Exception as exc:  # noqa: BLE001 - any failure means "no link"
+            # A failed connect still leaves a socket behind; the collector
+            # retries on a timer, so leaking one per attempt would add up.
+            close_client(client)
             raise DriverError(
                 f"Tezgaha bağlanılamadı ({self.cfg.tnc_ip}:"
                 f"{self.cfg.tnc_port or DEFAULT_PORT}): {exc}"
@@ -172,11 +200,7 @@ class HeidenhainLsv2Driver(Driver):
                 self._can[key] = False
 
     def disconnect(self) -> None:
-        if self._client is not None:
-            try:
-                self._client.disconnect()
-            except Exception:  # noqa: BLE001 - teardown must not raise
-                pass
+        close_client(self._client)
         self._client = None
 
     @property

@@ -440,6 +440,22 @@ td.genis { white-space: normal; word-break: break-word; }
 
 /* ---------------------------------------------------------------- narrower */
 
+/* The TNC panel is a 4:3 screen, typically 1024x768. At that width five metric
+   cards cannot share a row with the state card, and auto-fit leaves a ragged
+   3+2 split with a gap. Pin the counts so the grid stays even, and tighten the
+   vertical rhythm so the log list is still visible without scrolling. */
+@media (max-width: 1200px) {
+  .kartlar { grid-template-columns: repeat(3, 1fr); }
+  .olcumler { grid-template-columns: repeat(4, 1fr); }
+  .durumEtiket { font-size: 2.2rem; }
+  .kartDeger { font-size: 1.45rem; }
+  .kart { padding: 10px 14px; }
+  .olcum { padding: 9px 12px; }
+  .olcumDeger { font-size: 1.2rem; }
+  .sayfa { padding: 14px 16px; }
+  .logKutu { max-height: 46vh; }
+}
+
 @media (max-width: 900px) {
   .durumSeridi { grid-template-columns: 1fr; }
   .durumEtiket { font-size: 2.1rem; }

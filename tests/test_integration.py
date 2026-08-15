@@ -301,7 +301,11 @@ class TestConfig(unittest.TestCase):
     def test_defaults_without_a_file(self):
         cfg = load_config(os.path.join(self.tmp, "yok.ini"), base_dir=self.tmp)
         self.assertEqual(cfg.idle_threshold_s, 10.0)
-        self.assertEqual(cfg.driver, "simulator")
+        # Default is discovery, not the simulator: an unconfigured install
+        # must go looking for the real machine, never invent data.
+        self.assertEqual(cfg.driver, "auto")
+        self.assertEqual(cfg.tnc_ip, "")
+        self.assertTrue(cfg.auto_scan)
         self.assertEqual(cfg.web_bind, "127.0.0.1")
         self.assertIsNone(cfg.source_path)
 
