@@ -5,12 +5,15 @@
 (function () {
   "use strict";
 
-  var YENILEME_MS = 2000;
+  var YENILEME_MS = 2000;   // sunucudan gelen ayarla güncellenir
+  var LOG_LIMIT = 200;
   var otomatik = true;
   var aktifSekme = "ana";
   var sunucuFarki = 0;      // browser clock - server clock, in seconds
   var sonDurum = null;
   var gunlerYuklendi = false;
+  var sonLogImza = "";      // aynı içeriği yeniden çizmemek için
+  var donguId = null;
 
   // ------------------------------------------------------------- yardimcilar
 
@@ -54,6 +57,13 @@
   function durumUygula(d) {
     sonDurum = d;
     if (d.now) sunucuFarki = Date.now() / 1000 - d.now;
+
+    // Yavaş donanımda config'den aralık büyütülebilir; sunucu ne derse o.
+    if (d.yenileme_ms && d.yenileme_ms !== YENILEME_MS) {
+      YENILEME_MS = d.yenileme_ms;
+      if (donguId) clearInterval(donguId);
+      donguId = setInterval(dongu, YENILEME_MS);
+    }
 
     $("makineAdi").textContent = d.machine_name || "CNC Log System";
     $("makineId").textContent = d.machine_id || "—";
@@ -152,6 +162,15 @@
   // ------------------------------------------------------------------ loglar
 
   function loglariCiz(satirlar) {
+    // Rebuilding a few hundred rows every couple of seconds is the most
+    // expensive thing this page does, and the content usually has not
+    // changed. A cheap signature (count + newest row) skips the work.
+    var ilk = satirlar[0];
+    var imza = satirlar.length + "|" +
+      (ilk ? ilk.saat + "|" + ilk.etiket + "|" + ilk.mesaj : "");
+    if (imza === sonLogImza) return;
+    sonLogImza = imza;
+
     var kutu = $("logKutu");
     var kaydirma = kutu.scrollTop;
     kutu.textContent = "";
@@ -194,10 +213,16 @@
   function loglariYenile() {
     var tarih = $("fTarih").value || "bugun";
     var tur = $("fTur").value || "hepsi";
-    return getir("/api/loglar?kaynak=metin&limit=400&tarih=" +
+    return getir("/api/loglar?kaynak=metin&limit=" + LOG_LIMIT + "&tarih=" +
                  encodeURIComponent(tarih) + "&tip=" + encodeURIComponent(tur))
       .then(function (d) { loglariCiz(d.satirlar || []); })
       .catch(function () { /* transient; the next poll retries */ });
+  }
+
+  function filtreDegisti() {
+    // Filtre değişince aynı imza gelse bile yeniden çizilmeli.
+    sonLogImza = "";
+    loglariYenile();
   }
 
   // ------------------------------------------------------------------ rapor
@@ -412,16 +437,16 @@
   document.querySelectorAll(".sekme").forEach(function (b) {
     b.addEventListener("click", function () { sekmeAc(b.dataset.sekme); });
   });
-  $("fTarih").addEventListener("change", loglariYenile);
-  $("fTur").addEventListener("change", loglariYenile);
+  $("fTarih").addEventListener("change", filtreDegisti);
+  $("fTur").addEventListener("change", filtreDegisti);
   $("fOtomatik").addEventListener("change", function (e) {
     otomatik = e.target.checked;
-    if (otomatik) loglariYenile();
+    if (otomatik) filtreDegisti();
   });
   $("rTarih").addEventListener("change", raporYenile);
 
   gunleriYukle().then(loglariYenile);
   dongu();
-  setInterval(dongu, YENILEME_MS);
+  donguId = setInterval(dongu, YENILEME_MS);
   setInterval(sureTazele, 1000);
 })();

@@ -316,6 +316,7 @@ class Collector:
             "started_at": self._started_at,
             "idle_threshold_s": self.cfg.idle_threshold_s,
             "sample_interval_s": self.cfg.sample_interval_s,
+            "yenileme_ms": int(self.cfg.web_refresh_s * 1000),
             "storage_backend": getattr(self.storage, "backend", "?"),
         }
 

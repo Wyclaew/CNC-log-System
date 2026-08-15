@@ -39,6 +39,37 @@ GOMULU = os.path.join(KLASOR, "cnclog", "vendor", "python")
 
 WINDOWS = os.name == "nt" or platform.system().lower().startswith("win")
 
+#: VirtualBox paylasilan klasorleri ve benzeri baglama noktalari. HEROS'un
+#: SELinux politikasi bu yollardaki dosyalarin calistirilmasini engelliyor
+#: (base_t baglami), bu yuzden program buradan calistirilmamalidir.
+_RISKLI_YOLLAR = ("/mnt/sf", "/media/sf_", "/mnt/hgfs", "/run/user")
+
+
+def paylasilan_klasorde_mi(yol):
+    yol = os.path.abspath(yol)
+    return any(yol.startswith(k) for k in _RISKLI_YOLLAR)
+
+
+def _selinux_uyarisi():
+    print("")
+    print("=" * 62)
+    print(" SELINUX PROGRAMI ENGELLEDI")
+    print("=" * 62)
+    print(" Program su anda paylasilan bir klasorde duruyor:")
+    print("   %s" % KLASOR)
+    print("")
+    print(" HEROS'un guvenlik politikasi bu klasorlerden calistirmayi")
+    print(" yasakliyor. Cozum: klasoru EV DIZININE kopyalayin.")
+    print("")
+    print(" Terminalde sirasiyla:")
+    print("     cp -r %s ~/cnclog" % KLASOR)
+    print("     cd ~/cnclog")
+    print("     python baslat.py")
+    print("")
+    print(" Kopyalamak ayrica daha guvenlidir: paylasilan klasor")
+    print(" cikarilirsa kayit yarida kesilir.")
+    print("=" * 62)
+
 #: Denenecek acma yerleri, sirasiyla. Ilk sirada program klasoru var (her sey
 #: bir arada dursun); sonrasi noexec bir ev dizinine karsi yedeklerdir.
 def _hedef_adaylari():
@@ -407,7 +438,21 @@ def main(argv):
         return teshis()
 
     if "--kisayol" in argv:
+        if paylasilan_klasorde_mi(KLASOR):
+            print("UYARI: program paylasilan bir klasorde (%s)." % KLASOR)
+            print("Kisayol olusturulacak ama calismayabilir; once klasoru")
+            print("ev dizinine kopyalamaniz onerilir:")
+            print("    cp -r %s ~/cnclog" % KLASOR)
+            print("")
         return kisayol_olustur()
+
+    # Paylasilan klasorde calismak SELinux tarafindan engellenebiliyor.
+    # Baslamadan once soyleyelim: hata mesaji tek basina anlasilmiyor.
+    if paylasilan_klasorde_mi(KLASOR) and not WINDOWS:
+        print("NOT: Program paylasilan bir klasorde calisiyor (%s)." % KLASOR)
+        print("     Sorun cikarsa klasoru ev dizinine kopyalayin:")
+        print("     cp -r %s ~/cnclog" % KLASOR)
+        print("")
 
     if "--python-bilgi" in argv:
         # Kisa surum: sadece hangi Python kullanilacagini soyler.
@@ -442,6 +487,17 @@ def main(argv):
         return subprocess.call(komut, cwd=KLASOR, env=ortam)
     except KeyboardInterrupt:
         return 0
+    except OSError as hata:
+        # EACCES burada neredeyse her zaman SELinux'un paylasilan klasorden
+        # calistirmayi engellemesidir; ham hata bunu anlatmiyor.
+        import errno
+
+        if getattr(hata, "errno", None) == errno.EACCES \
+                and paylasilan_klasorde_mi(KLASOR):
+            _selinux_uyarisi()
+        else:
+            print("Program baslatilamadi: %s" % hata, file=sys.stderr)
+        return 1
     except Exception as hata:
         print("Program baslatilamadi: %s" % hata, file=sys.stderr)
         return 1

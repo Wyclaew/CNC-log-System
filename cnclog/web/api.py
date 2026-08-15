@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -21,8 +22,16 @@ from ..model import STATE_LABELS, MachineState
 _CLOCK_RE = re.compile(r"^\d{2}:\d{2}:\d{2}$")
 _TAG_START, _TAG_END = 10, 22
 
-#: How much of a large log file to read when tailing.
-_TAIL_BYTES = 256 * 1024
+#: How much of a large log file to read when tailing. Enough for a few hundred
+#: lines; reading a quarter of a megabyte every two seconds was noticeable on
+#: the control's own hardware.
+_TAIL_BYTES = 64 * 1024
+
+#: Seconds to reuse the day summary. Recomputing it means walking every event
+#: of the day, which gets slower as the shift goes on -- and the browser asks
+#: for it every couple of seconds. The counters are durations in minutes; a few
+#: seconds of staleness is invisible.
+_OZET_TTL = 5.0
 
 _KNOWN_TAGS = {label: state for state, label in STATE_LABELS.items()}
 _EVENT_TAGS = {"ALARM", "PROGRAM", "BAKIM", "HATA"}
@@ -36,6 +45,23 @@ class Api:
         self.cfg = app.cfg
         self.storage = app.storage
         self.collector = app.collector
+        self._ozet_lock = threading.Lock()
+        self._ozet: Optional[Dict[str, Any]] = None
+        self._ozet_ts = 0.0
+
+    def _gunluk_ozet(self, now: float) -> Dict[str, Any]:
+        """Today's totals, cached briefly. See _OZET_TTL."""
+        with self._ozet_lock:
+            if self._ozet is not None and (now - self._ozet_ts) < _OZET_TTL:
+                return self._ozet
+            day = report.parse_day(None)
+            ts_from, ts_to = report.day_bounds(day)
+            summary = report.summarize(
+                self.storage, self.cfg, ts_from, ts_to, now=now
+            )
+            self._ozet = summary
+            self._ozet_ts = now
+            return summary
 
     # ------------------------------------------------------------------ durum
 
@@ -43,9 +69,7 @@ class Api:
         """Live state plus a running summary of the current day."""
         status = self.collector.status()
         now = self._now(status)
-        day = report.parse_day(None)
-        ts_from, ts_to = report.day_bounds(day)
-        summary = report.summarize(self.storage, self.cfg, ts_from, ts_to, now=now)
+        summary = self._gunluk_ozet(now)
 
         status["bugun"] = {
             "run_s": summary["run_s"],

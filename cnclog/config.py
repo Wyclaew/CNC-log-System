@@ -50,6 +50,7 @@ DEFAULTS = {
         "bind": "127.0.0.1",
         "port": "8760",
         "tarayici_ac": "evet",
+        "yenileme_sn": "2",
     },
     "vardiya": {
         "baslangiclar": "08:00, 16:00, 00:00",
@@ -103,6 +104,9 @@ class Config:
     web_bind: str = "127.0.0.1"
     web_port: int = 8760
     open_browser: bool = True
+    #: How often the browser re-polls. Raise it on slow hardware -- the
+    #: control's own PC and a VM both benefit from 4-5 seconds.
+    web_refresh_s: float = 2.0
 
     # [vardiya]
     shift_starts: List[str] = field(default_factory=lambda: ["08:00", "16:00", "00:00"])
@@ -206,6 +210,7 @@ def load_config(path: Optional[str] = None, base_dir: Optional[str] = None) -> C
         web_bind=get("web", "bind").strip() or "127.0.0.1",
         web_port=_as_int(get("web", "port"), 8760),
         open_browser=_as_bool(get("web", "tarayici_ac"), True),
+        web_refresh_s=max(1.0, _as_float(get("web", "yenileme_sn"), 2.0)),
         shift_starts=shifts or ["08:00", "16:00", "00:00"],
         source_path=source,
         base_dir=base,

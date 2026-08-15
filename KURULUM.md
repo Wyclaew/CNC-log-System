@@ -111,9 +111,23 @@ CNC log System/
 
 2. Klasörü USB'den **ev dizinine kopyala**. Masaüstüne veya `~/cnclog` olur.
 
-   > **Neden kopyalamak gerekiyor:** USB genelde "çalıştırma yasak" (noexec)
-   > olarak bağlanır ve program oradan çalışmaz. Ayrıca USB'yi çıkarınca kayıt
-   > durur. Kopyalayın.
+   > **Bu adım isteğe bağlı değil.** USB ve paylaşılan klasörler (`/mnt/sf/…`)
+   > HEROS'un SELinux politikası tarafından "çalıştırma yasak" sayılır ve
+   > program orada şu hatayı verir:
+   >
+   > ```
+   > SELinux blocked program execution
+   > avc: denied { execute } ... tcontext=user_u:object_r:base_t
+   > ```
+   >
+   > Ev dizinine kopyalayınca sorun kalkar. Ayrıca USB/paylaşılan klasör
+   > çıkarılırsa kayıt yarıda kesilir; ev dizini bundan da korur.
+   >
+   > Terminalden kopyalamak isterseniz:
+   > ```bash
+   > cp -r /mnt/sf/Install/cnclog ~/cnclog
+   > cd ~/cnclog
+   > ```
 
 3. Terminali aç: **Menü → Tools → Terminal**
    *(videodaki gibi; `user ~/Desktop $` yazan pencere)*
@@ -427,6 +441,10 @@ kayıtları çok küçüktür ve **hiç silinmez**.
 | Belirti | Çözüm |
 |---|---|
 | `sh: no permission to execute baslat.sh` | `python baslat.py` veya `bash baslat.sh` kullanın. HEROS'un `sh`'ı kısıtlı; `chmod +x` ve `sudo` çözmez. |
+| `SELinux blocked program execution` | Klasör paylaşılan/USB üzerinde. **Ev dizinine kopyalayın:** `cp -r /mnt/sf/Install/cnclog ~/cnclog` |
+| Windows: `Python was not found` | `python baslat.py` yerine **`baslat.bat`** kullanın. Windows'ta sistem Python'u yok; `baslat.bat` gömülü olanı bulur. |
+| Arayüz ağır/kasıyor | `config.ini` → `[web] yenileme_sn = 4`. Ayrıca `tarayici_ac = hayir` yapıp tarayıcıyı bir kez elle açın. |
+| Her başlatmada yeni sekme açılıyor | `config.ini` → `[web] tarayici_ac = hayir`. Tarayıcıyı bir kez açıp `127.0.0.1:8760` sayfasını açık bırakın. |
 | `python: can't open file 'baslat.py'` | Dosya klasörde yok — eski bir kopya kullanıyorsunuz. Paketi yeniden kopyalayın. |
 | Tarayıcı açıldı ama boş sayfa | Adres satırına `127.0.0.1:8760` yazın. Program çalışıyor, tarayıcı adrese gitmemiş. |
 | `Calisir bir Python 3 bulunamadi` | `python baslat.py --teshis` çalıştırıp çıktıyı gönderin. |
