@@ -8,10 +8,10 @@ tarayıcıda açılan bir arayüzde gösterir.
 - **Kurulum için → [KURULUM.md](KURULUM.md)**
 
 ```bash
-sh baslat.sh                     # tezgahı ağda bul, bağlan, kaydet
-sh baslat.sh --tara              # sadece ara ve sonucu göster
-sh baslat.sh --test-baglanti     # bağlan, tek okuma yap, çık
-sh baslat.sh --surucu simulator  # sahte tezgahla dene
+python baslat.py                     # tezgahı ağda bul, bağlan, kaydet
+python baslat.py --tara              # sadece ara ve sonucu göster
+python baslat.py --test-baglanti     # bağlan, tek okuma yap, çık
+python baslat.py --teshis            # ortam teşhisi (Python, noexec, ağ)
 ```
 
 Windows'ta (CMD / PowerShell) aynı komutlar `baslat.bat` ile çalışır. Windows
@@ -31,6 +31,7 @@ Bu programın her mimari kararı, şu ortamdan çıktı:
 | İnternet yok | Hiçbir şey indirilmez; CDN, font, paket yok |
 | Tezgah üretimde | Sürücülerde yazma metodu **yok** |
 | Operatör IP bilmiyor | Tezgahı program kendisi bulur |
+| HEROS'ta shell betiği çalıştırılamıyor | `baslat.py` — exec izni gerektirmez |
 
 ---
 
@@ -75,9 +76,10 @@ cnclog/
 ├── collector.py        örnekleme döngüsü (arka plan thread)
 ├── discovery.py        ağda TNC arama (port taraması + LSV2 doğrulaması)
 ├── report.py           gün/vardiya özeti, program süreleri, CSV
-├── lock.py             tek örnek kilidi (flock)
+├── lock.py             tek örnek kilidi (flock / msvcrt)
 ├── app.py              orkestratör, çökme kurtarma
 ├── __main__.py         CLI
+│   (kök dizinde baslat.py: Python 2.7 ile de çalışan başlatıcı)
 ├── drivers/
 │   ├── base.py             Driver arayüzü (yazma metodu YOK)
 │   ├── registry.py         isimden sürücü üretimi (geç import)
@@ -91,7 +93,7 @@ cnclog/
 │   └── static/         tek sayfa arayüz (harici kaynak yok)
 └── vendor/
     ├── pyLSV2/         gömülü kütüphane (MIT)
-    └── python/         taşınabilir Python 3.11 (musl + glibc)
+    └── python/         taşınabilir Python 3.11 (linux musl+glibc, windows)
 ```
 
 ## Veri akışı
@@ -124,9 +126,10 @@ kalanları `None` bırakmalıdır.
 python3 -m unittest discover -s tests -t . -v
 ```
 
-137 test: durum makinesi ve eşik davranışı, rapor aritmetiği, log formatı ↔ web
-ayrıştırıcı uyumu, sürücü eşlemeleri, keşif ve soket temizliği, tek örnek
-kilidi, çökme kurtarma, sekiz saatlik uçtan uca simüle vardiya.
+146 test: durum makinesi ve eşik davranışı, rapor aritmetiği, log formatı ↔ web
+ayrıştırıcı uyumu, sürücü eşlemeleri, keşif/soket temizliği/arayüz sayımı,
+"reddedildi" ile "bulunamadı" ayrımı, tek örnek kilidi, çökme kurtarma,
+sekiz saatlik uçtan uca simüle vardiya.
 
 ## Lisans notu
 

@@ -9,12 +9,19 @@ duruşları ve alarmları tutan, gün/vardiya raporu çıkaran bir program.
 **Özet:** USB'yi tak, klasörü kopyala, `sh baslat.sh` yaz. Kurulum yok, paket
 indirme yok, internet gerekmez. Program tezgahı ağda kendisi bulur.
 
-| Nerede çalıştıracaksınız | Ne yapacaksınız |
+| Nerede çalıştıracaksınız | Ne yazacaksınız |
 |---|---|
-| Tezgah (HEROS/Linux) | `sh baslat.sh` |
+| **Tezgah (HEROS)** | **`python baslat.py`** ← bunu kullanın |
+| Linux / macOS | `python3 baslat.py` veya `sh baslat.sh` |
 | Windows — CMD / PowerShell | `baslat.bat` |
 | Windows — Git Bash | `sh baslat.sh` |
-| macOS | `sh baslat.sh` |
+
+> **HEROS'ta neden `baslat.py`?** `sh baslat.sh` şu hatayı verebiliyor:
+> `sh: no permission to execute baslat.sh`. Dosya sistemi "çalıştırma yasak"
+> (noexec) bağlanmış olabiliyor ve `chmod +x` bunu çözmüyor, `sudo` şifresi de
+> yok. `python baslat.py` bu sorunu tamamen atlar: çalıştırılan şey zaten
+> kurulu olan `python`, dosya yalnızca okunur. **Bir şey ters giderse:**
+> `python baslat.py --teshis`
 
 **Windows'ta simülatörle denemek için → [3B bölümü](#3b-windowsta-tnc-640-programming-station-ile-deneme)**
 
@@ -96,16 +103,24 @@ CNC log System/
 
 ```bash
 cd ~/Desktop/cnclog
-sh baslat.sh
+python baslat.py
 ```
 
-`sh baslat.sh` şeklinde yazın — `./baslat.sh` çalıştırma izni ister, `sh` ile
-başlatmak buna gerek bırakmaz.
+**`sh baslat.sh` değil, `python baslat.py`.** HEROS'ta shell betikleri
+"no permission to execute" hatası verebiliyor; `chmod +x` ve `sudo` bunu
+çözmüyor. `python baslat.py` bu sorunu tamamen atlar.
+
+Bir sorun çıkarsa önce şunu çalıştırın — hiçbir şeyi değiştirmez, sadece
+ortamı inceler ve nerenin yazılabilir/çalıştırılabilir olduğunu söyler:
+
+```bash
+python baslat.py --teshis
+```
 
 İlk çalıştırmada şunu görürsünüz:
 
 ```
-Python 3 hazirlaniyor (musl)... ilk calistirmada bir defa yapilir.
+Python 3 hazirlaniyor (linux-musl -> /home/user/Desktop/cnclog/...)...
 Hazir: /home/user/Desktop/cnclog/cnclog/vendor/python/rt/python/bin/python3
 ==============================================================
  CNC Log System 1.0.0 — Heidenhain TNC 640 (TEZGAH-01)
@@ -183,14 +198,55 @@ bekleyin. PLC programının çalışıyor olması gerekir (normal açılışta �
 Kontrol ekranında:
 
 ```
-Programlama modu (Programming and Editing)
-   → MOD tuşu
-   → External access = ON
-   → END
+1) PROGRAMLAMA moduna geçin        ← önemli
+2) MOD tuşuna basın
+3) External access = ON
+4) END ile onaylayın
 ```
+
+> **Manual operation modunda bakmayın.** Bu ayar orada görünmez veya geçerli
+> olmaz. Programlama moduna geçmeden MOD'a bakmak "zaten açık" izlenimi
+> verebilir.
 
 Heidenhain bu ayarı güvenlik gerekçesiyle **varsayılan olarak kapalı** tutar.
 Aynı ayar gerçek tezgahta da gereklidir.
+
+Ayar doğru değilse program bunu **net olarak söyler** — "bulunamadı" demez:
+
+```
+TEZGAH BULUNDU ama erişime izin vermedi.
+
+  192.168.1.10:19000 — Tezgah cevap verdi ama erişimi reddetti (yetki yok).
+  Dış erişim kapalı. Kontrol ekranında:
+    1) PROGRAMLAMA moduna geçin (Manual operation'da bu ayar görünmez)
+    ...
+```
+
+Böyle bir mesaj görüyorsanız **adres aramanıza gerek yok** — tezgah zaten
+bulundu, sadece bu ayarı açmanız gerekiyor.
+
+### Simülatör sanal makinede ise (VirtualBox)
+
+TNC 640 Programming Station genelde VirtualBox içinde çalışır. O zaman
+simülatör **`127.0.0.1` değildir** — sanal makinenin kendi adresindedir.
+Adresi kontrol ekranından görebilirsiniz:
+
+```
+MOD → System settings → Network: IP configuration
+```
+
+Orada `eth0` ve `eth1` satırlarındaki `inet` adreslerini göreceksiniz; örneğin
+`192.168.1.10` (köprülü ağ) ve `192.168.56.101` (host-only ağ).
+
+Program bu ağların ikisini de kendi tarar — Windows'taki tüm ağ adaptörlerini
+(host-only dahil) bulup her birinin ağını tarar. Yine de bulunamazsa adresi
+elle yazabilirsiniz:
+
+```ini
+[surucu]
+tnc_ip = 192.168.1.10
+otomatik_arama = hayir
+```
 
 **3. Programı çalıştırın.** CMD veya PowerShell açıp:
 
@@ -345,9 +401,11 @@ kayıtları çok küçüktür ve **hiç silinmez**.
 
 | Belirti | Çözüm |
 |---|---|
-| `Calisir bir Python 3 bulunamadi` | `sh kurulum/kesif.sh` çalıştırıp çıktıyı gönderin. Gömülü arşiv kopyalanmamış olabilir. |
-| `Python'u acacak yazilabilir bir klasor bulunamadi` | Program klasörü salt-okunur bir yerde (USB). Ev dizinine kopyalayın. |
-| Permission denied | `./baslat.sh` yerine `sh baslat.sh` yazın. |
+| `sh: no permission to execute baslat.sh` | `python baslat.py` kullanın. Dosya sistemi noexec bağlanmış; `chmod +x` ve `sudo` çözmez. |
+| `Calisir bir Python 3 bulunamadi` | `python baslat.py --teshis` çalıştırıp çıktıyı gönderin. |
+| `Python'u acacak yazilabilir bir klasor bulunamadi` | Program klasörü salt-okunur (USB). Ev dizinine kopyalayın; `baslat.py` ayrıca `/tmp`'yi de dener. |
+| `TEZGAH BULUNDU ama erişime izin vermedi` | Dış erişim kapalı. PROGRAMLAMA modu → MOD → External access = ON → END. Adres aramanıza gerek yok. |
+| Permission denied | `./baslat.sh` yerine `python baslat.py` yazın. |
 | `Program zaten çalışıyor (PID …)` | İkinci kopya açılmaya çalışıldı. Bu koruma kasıtlıdır: iki kopya aynı veriye yazarsa süreler bozulur. |
 | Tezgah bulunamıyor | `sh baslat.sh --tara`. Tezgah açık mı, LSV2/DNC erişimi açık mı kontrol edin. |
 | Bağlanıyor ama veri yok | DNC opsiyonu (18) lisanslı değil veya LSV2 kapalı. Servisten açtırın. |
@@ -380,16 +438,31 @@ sh kurulum/kesif.sh 192.168.1.50
 
 ## Hızlı komut özeti
 
+Tezgahta (HEROS) ve genel olarak en güvenli yol:
+
 ```bash
-sh baslat.sh                       # normal çalıştır
-sh baslat.sh --tara                # tezgahı ağda ara
-sh baslat.sh --test-baglanti       # bağlantıyı test et, veri oku, çık
-sh baslat.sh --rapor bugun         # günün raporunu ekrana bas
-sh baslat.sh --web-yok             # arayüzsüz, sadece kayıt
-sh baslat.sh --port 8761           # başka port
-sh baslat.sh --python-bilgi        # hangi Python kullanılıyor
-sh baslat.sh --surucu simulator    # sahte tezgahla dene (sadece deneme!)
-sh baslat.sh --help                # tüm seçenekler
+python baslat.py                   # normal çalıştır
+python baslat.py --teshis          # ortamı incele (sorun varsa ilk bu)
+python baslat.py --tara            # tezgahı ağda ara
+python baslat.py --test-baglanti   # bağlan, veri oku, çık
+python baslat.py --rapor bugun     # günün raporunu ekrana bas
+python baslat.py --web-yok         # arayüzsüz, sadece kayıt
+python baslat.py --port 8761       # başka port
+python baslat.py --surucu simulator  # sahte tezgahla dene (sadece deneme!)
+python baslat.py --help            # tüm seçenekler
+```
+
+Windows'ta (CMD / PowerShell) aynı komutlar `baslat.bat` ile:
+
+```
+baslat.bat --tara
+baslat.bat --test-baglanti
+baslat.bat
+```
+
+Kurulum yardımcıları:
+
+```bash
 sh kurulum/menuye-ekle.sh          # XFCE menüsüne ekle
 sh kurulum/kesif.sh                # sistem raporu
 ```

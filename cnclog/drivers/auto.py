@@ -73,6 +73,7 @@ class AutoDriver(Driver):
         if self._known_host and (time.time() - self._known_at) < _REMEMBER_S:
             preferred = self._known_host
 
+        refusals: List[str] = []
         found = find_control(
             configured_ip=preferred,
             port=port,
@@ -80,12 +81,19 @@ class AutoDriver(Driver):
             scan_subnet=getattr(self.cfg, "auto_scan", True),
             on_progress=self._note,
             should_continue=self.should_continue,
+            refusals=refusals,
         )
 
         if found is None:
             self._found = None
             if self.should_continue and not self.should_continue():
                 raise DriverError("Arama iptal edildi (program kapanıyor)")
+            if refusals:
+                # Found it, but it said no. Report the fix, not a search.
+                self._note("Tezgah bulundu ama erişim reddedildi")
+                raise DriverError(
+                    "Tezgah bulundu ama erişime izin vermedi.\n" + refusals[0]
+                )
             raise DriverError(self._not_found_message(port))
 
         self._found = found

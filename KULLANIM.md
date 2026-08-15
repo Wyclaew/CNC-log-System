@@ -12,7 +12,7 @@ yoktur — açık kalması yeterlidir.
 
 | Ne yapmak istiyorsunuz | Ne yapacaksınız |
 |---|---|
-| Programı başlatmak | Menüden **CNC Log**, veya terminalde `sh baslat.sh` |
+| Programı başlatmak | Menüden **CNC Log**, veya terminalde `python baslat.py` |
 | Ekrana bakmak | Tarayıcı penceresi; alt-tab ile geçilir |
 | Programı kapatmak | Terminalde **Ctrl+C** |
 | Günün raporunu almak | Arayüzde **Rapor** sekmesi |
@@ -204,9 +204,9 @@ sütunlar doğru ayrılır).
 ### Terminalden
 
 ```bash
-sh baslat.sh --rapor bugun
-sh baslat.sh --rapor dun
-sh baslat.sh --rapor 2026-08-10
+python baslat.py --rapor bugun
+python baslat.py --rapor dun
+python baslat.py --rapor 2026-08-10
 ```
 
 Bu komut program çalışırken de kullanılabilir, kaydı bozmaz.
@@ -276,11 +276,11 @@ vardır. Programın kendisi de hiçbir şey yazamaz.
 Bir sorun olursa şunu çalıştırıp çıktısını gönderin — hiçbir şeyi değiştirmez:
 
 ```bash
-sh kurulum/kesif.sh
+python baslat.py --teshis
 ```
 
 Tezgah bulunamıyorsa:
 
 ```bash
-sh baslat.sh --tara
+python baslat.py --tara
 ```

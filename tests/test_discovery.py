@@ -125,6 +125,100 @@ class TestOpenPortIsNotAControl(unittest.TestCase):
         self.assertEqual(leaked, [], "doğrulama sonrası soket sızdı")
 
 
+class TestRefusalDetection(unittest.TestCase):
+    """"Denied" and "not there" must not look the same to the operator.
+
+    A control that answers LSV2 and refuses the login has been *found*; the
+    fix is one setting on the machine. Reporting "not found" would send
+    someone hunting for an IP address that is already known.
+    """
+
+    def setUp(self):
+        self.server = FakeServer()
+
+    def tearDown(self):
+        self.server.close()
+
+    def test_plain_socket_produces_no_refusal(self):
+        reasons = []
+        discovery.verify_lsv2(
+            "127.0.0.1", self.server.port, timeout=0.5, reason=reasons
+        )
+        self.assertEqual(reasons, [], "LSV2 konuşmayan servis red sayılmamalı")
+
+    def test_log_catcher_recognises_privilege_error(self):
+        catcher = discovery._LogCatcher()
+        catcher.messages = [
+            "Connected to host 192.168.1.10 at port 19000",
+            "an error was received after the last transmission, Error Type: 1,"
+            " Error Code: 23 'LSV2_ERROR_T_ER_NO_PRIV'",
+        ]
+        self.assertTrue(catcher.saw_privilege_error())
+
+    def test_log_catcher_recognises_failed_login(self):
+        catcher = discovery._LogCatcher()
+        catcher.messages = ["error logging in as INSPECT"]
+        self.assertTrue(catcher.saw_privilege_error())
+
+    def test_log_catcher_ignores_ordinary_messages(self):
+        catcher = discovery._LogCatcher()
+        catcher.messages = ["Socket successfully created", "Connection closed"]
+        self.assertFalse(catcher.saw_privilege_error())
+
+    def test_catcher_restores_logger_levels(self):
+        """It raises log levels temporarily; leaving them raised would flood
+        the operator's console with pyLSV2 debug output."""
+        from cnclog.drivers.heidenhain_lsv2 import _PYLSV2_LOGGERS
+
+        import logging
+
+        before = {n: logging.getLogger(n).level for n in _PYLSV2_LOGGERS}
+        with discovery._LogCatcher():
+            pass
+        after = {n: logging.getLogger(n).level for n in _PYLSV2_LOGGERS}
+        self.assertEqual(before, after)
+
+    def test_catcher_removes_its_handler(self):
+        from cnclog.drivers.heidenhain_lsv2 import _PYLSV2_LOGGERS
+
+        import logging
+
+        catcher = discovery._LogCatcher()
+        with catcher:
+            pass
+        for name in _PYLSV2_LOGGERS:
+            self.assertNotIn(catcher, logging.getLogger(name).handlers)
+
+
+class TestInterfaceEnumeration(unittest.TestCase):
+    """A virtualised control often sits on a host-only adapter with no
+    default route -- the address must still be discovered."""
+
+    def test_command_parsing_finds_addresses(self):
+        addresses = discovery._addresses_from_commands()
+        self.assertIsInstance(addresses, list)
+        for address in addresses:
+            self.assertRegex(address, r"^\d{1,3}(\.\d{1,3}){3}$")
+
+    def test_loopback_and_linklocal_filtered(self):
+        self.assertFalse(discovery._usable("127.0.0.1"))
+        self.assertFalse(discovery._usable("169.254.10.4"))
+        self.assertFalse(discovery._usable("0.0.0.0"))
+        self.assertTrue(discovery._usable("192.168.56.1"))
+
+    def test_addr_line_matches_all_three_formats(self):
+        samples = [
+            ("   IPv4 Address. . . . . . . . . . . : 192.168.56.1", "192.168.56.1"),
+            ("    inet 192.168.1.10/24 brd 192.168.1.255 scope global", "192.168.1.10"),
+            ("\tinet 10.0.2.15 netmask 0xffffff00 broadcast 10.0.2.255", "10.0.2.15"),
+        ]
+        for line, expected in samples:
+            with self.subTest(line=line):
+                match = discovery._ADDR_LINE.search(line)
+                self.assertIsNotNone(match, "satır tanınmadı")
+                self.assertEqual(match.group(1), expected)
+
+
 class TestCandidateOrder(unittest.TestCase):
     def test_configured_address_comes_first(self):
         candidates = discovery.candidate_addresses("10.1.2.3")

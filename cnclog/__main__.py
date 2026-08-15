@@ -186,29 +186,41 @@ def _tara(args) -> int:
     print(f"  Bu makinenin adresleri: {', '.join(adresler) or '(bulunamadı)'}")
     print("-" * 60)
 
+    redler = []
     bulunan = discovery.find_control(
         configured_ip=cfg.tnc_ip or None,
         port=port,
         timeout=cfg.timeout_s,
         scan_subnet=cfg.auto_scan,
         on_progress=lambda m: print(f"  {m}"),
+        refusals=redler,
     )
     print("-" * 60)
 
     if bulunan is None:
+        # A refusal is a *found* machine with a setting to fix. Saying "not
+        # found" here would send the operator hunting for an IP address that
+        # was already located.
+        if redler:
+            print("\nTEZGAH BULUNDU ama erişime izin vermedi.\n")
+            for satir in redler:
+                print(f"  {satir}")
+            print("\nBu ayarı yaptıktan sonra tekrar deneyin; adres aramaya")
+            print("gerek yok, tezgah zaten bulundu.")
+            return 1
+
         print("\nHiçbir Heidenhain kontrol bulunamadı.\n")
-        print("EN SIK SEBEP — tezgahta dış erişim kapalı:")
-        print("  Kontrol ekranında Programlama moduna geçin, MOD tuşuna basın,")
-        print("  'External access' ayarını ON yapın, END ile çıkın.")
-        print("  (Bu ayar TNC 640 Programming Station simülatöründe de gerekir.)")
-        print("\nDiğer kontroller:")
+        print("Kontroller:")
         print("  - Tezgah/simülatör açık mı, PLC programı çalışıyor mu?")
         print(f"  - Bu makine tezgahla aynı ağda mı? (port {port})")
-        print("  - Simülatör aynı bilgisayarda ise 127.0.0.1 denenmiş olmalı;")
-        print("    yukarıdaki listede göründüğünden emin olun.")
-        print("  - Adresi biliyorsanız config.ini içine yazın:")
+        print("  - Dış erişim açık mı? PROGRAMLAMA modu → MOD →")
+        print("    External access = ON → END")
+        print("  - Simülatör sanal makinede ise (VirtualBox vb.) sanal")
+        print("    makinenin IP'sini kontrol edin; yukarıda taranan ağlarda")
+        print("    görünmüyorsa config.ini'ye elle yazın.")
+        print("  - Adresi biliyorsanız:")
         print("        [surucu]")
-        print("        tnc_ip = 192.168.1.50")
+        print("        tnc_ip = 192.168.1.10")
         return 1
 
     print(f"\nBULUNDU: {bulunan}")
