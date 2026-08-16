@@ -171,6 +171,9 @@ class Api:
                 continue
             out.append(
                 {
+                    "tarih": datetime.fromtimestamp(row["ts_start"]).strftime(
+                        "%d.%m.%Y"
+                    ),
                     "saat": datetime.fromtimestamp(row["ts_start"]).strftime("%H:%M:%S"),
                     "bitis": (
                         datetime.fromtimestamp(row["ts_end"]).strftime("%H:%M:%S")
@@ -202,13 +205,10 @@ class Api:
         now = self._now()
         summary = report.summarize(self.storage, self.cfg, ts_from, ts_to, now=now)
         summary["tarih"] = day.isoformat()
-        summary["vardiyalar"] = [
-            dict(
-                report.summarize(self.storage, self.cfg, begin, end, now=now),
-                etiket=label,
-            )
-            for label, begin, end in report.shift_bounds(self.cfg, day)
-        ]
+        # Flat, chronological list of everything that happened -- this is what
+        # gets read in practice. (Shift breakdowns were dropped: they cost
+        # three extra full-day passes and nobody used them.)
+        summary["olaylar"] = self._event_rows(params.get("tarih"), 1000, None)
         return summary
 
     def rapor_csv(self, params: Dict[str, str]) -> str:

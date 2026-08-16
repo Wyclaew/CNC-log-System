@@ -305,22 +305,28 @@
     ozet.appendChild(tbody);
     hedef.appendChild(blokYap("Gün özeti", ozet));
 
-    if (r.vardiyalar && r.vardiyalar.length) {
-      hedef.appendChild(blokYap("Vardiyalar", tabloYap(
-        ["Vardiya", "Çalışma", "Duruş", "Kullanılabilirlik", "Duruş sayısı", "Alarm"],
-        r.vardiyalar.map(function (v) {
-          return [
-            v.etiket,
-            sureMetni(v.run_s),
-            sureMetni(v.down_s),
-            v.availability === null || v.availability === undefined
-              ? "—" : "%" + Number(v.availability).toFixed(1),
-            v.stop_count,
-            v.alarm_count
-          ];
-        }),
-        [1, 2, 3, 4, 5]
-      )));
+    if (r.olaylar && r.olaylar.length) {
+      hedef.appendChild(blokYap(
+        "Tüm kayıtlar (" + r.olaylar.length + " satır)",
+        tabloYap(
+          ["Tarih", "Saat", "Bitiş", "Durum", "Süre", "Açıklama"],
+          r.olaylar.map(function (o) {
+            var aciklama = o.mesaj || "";
+            if (o.kod) aciklama = "[" + o.kod + "] " + aciklama;
+            if (o.program && !aciklama) aciklama = o.program;
+            if (o.acik) aciklama = (aciklama ? aciklama + "  " : "") + "(devam ediyor)";
+            return [
+              o.tarih,
+              o.saat,
+              o.bitis || "—",
+              o.etiket,
+              sureMetni(o.sure_s),
+              aciklama || "—"
+            ];
+          }),
+          [4]
+        )
+      ));
     }
 
     if (r.programs && r.programs.length) {

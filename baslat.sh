@@ -37,6 +37,75 @@ for arg in "$@"; do
 done
 bilgi() { [ "$BILGI_MODU" = "1" ] && echo "  $1"; }
 
+# --------------------------------------------------------------- kisayol
+# HEROS'ta SELinux 'python baslat.py' calistirmayi engelliyor ama
+# 'bash baslat.sh' calisiyor. Bu yuzden kisayollar da bash uzerinden
+# tanimlanir; boylece cift tiklama guvenilir sekilde calisir.
+kisayol_yaz() {
+    HEDEF="$1"; TERMINAL="$2"; EK="$3"
+    DIZIN="${HEDEF%/*}"
+    mkdir -p "$DIZIN" 2>/dev/null || return 1
+    cat > "$HEDEF" <<EOF
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=CNC Log
+GenericName=Tezgah Veri Kaydi
+Comment=Tezgah verilerini kaydeder ve logu gosterir
+Exec=bash "$KLASOR/baslat.sh"$EK
+Path=$KLASOR
+Icon=utilities-system-monitor
+Terminal=$TERMINAL
+Categories=Utility;Monitor;
+StartupNotify=true
+EOF
+    chmod +x "$HEDEF" 2>/dev/null
+    return 0
+}
+
+if [ "$1" = "--kisayol" ]; then
+    MENU="$HOME/.local/share/applications/cnclog.desktop"
+    YAZILAN=""
+    kisayol_yaz "$MENU" "true" "" && YAZILAN="$MENU"
+    for AD in Desktop Masaüstü Masaustu; do
+        if [ -d "$HOME/$AD" ]; then
+            kisayol_yaz "$HOME/$AD/cnclog.desktop" "true" "" && \
+                YAZILAN="$YAZILAN
+$HOME/$AD/cnclog.desktop"
+            break
+        fi
+    done
+    if [ -z "$YAZILAN" ]; then
+        echo "HATA: kisayol olusturulamadi." >&2
+        exit 1
+    fi
+    echo "Kisayol olusturuldu:"
+    echo "$YAZILAN" | sed 's/^/  /'
+    echo
+    echo "Artik masaustundeki 'CNC Log' simgesine cift tiklayarak"
+    echo "baslatabilirsiniz. Menude gorunmezse oturumu kapatip acin."
+    echo
+    echo "Bilgisayar acilinca kendiliginden baslamasi icin:"
+    echo "    bash baslat.sh --otomatik-baslat"
+    exit 0
+fi
+
+if [ "$1" = "--otomatik-baslat" ]; then
+    OTO="$HOME/.config/autostart/cnclog.desktop"
+    # Otomatik baslangicta terminal penceresi acilmasin ve tarayici
+    # kendiliginden acilmasin; operator hazir oldugunda arayuzu acar.
+    if kisayol_yaz "$OTO" "false" " --tarayici-yok"; then
+        echo "Otomatik baslatma acildi: $OTO"
+        echo "Bilgisayar her acildiginda kayit kendiliginden baslayacak."
+        echo "Arayuz: http://127.0.0.1:8760"
+        echo
+        echo "Kapatmak icin:  rm $OTO"
+        exit 0
+    fi
+    echo "HATA: otomatik baslatma ayarlanamadi." >&2
+    exit 1
+fi
+
 # Windows mi? Git Bash / MSYS / Cygwin altinda calisiyor olabiliriz.
 SISTEM=$(uname -s 2>/dev/null || echo bilinmiyor)
 WINDOWS=0

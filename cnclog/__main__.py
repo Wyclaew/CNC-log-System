@@ -21,7 +21,7 @@ import threading
 import time
 import webbrowser
 from datetime import datetime
-from typing import Optional
+from typing import Optional  # noqa: F401 - used in annotations below
 
 from . import __version__, report
 from .app import AlreadyRunning, build_application
@@ -65,6 +65,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Tezgaha bağlan, tek okuma yap, sonucu göster ve çık")
     parser.add_argument("--tara", action="store_true",
                         help="Ağda Heidenhain kontrol ara ve bulunanları listele")
+    parser.add_argument("--izle", action="store_true",
+                        help="Tezgahtan gelen ham değerleri canlı göster "
+                             "(teşhis; kayıt tutmaz)")
     parser.add_argument("--surum", action="version", version=f"cnclog {__version__}")
     return parser
 
@@ -168,20 +171,28 @@ def _rapor_calistir(args, tarih_metni: str) -> int:
     ozet = report.summarize(app.storage, app.cfg, ts_from, ts_to)
     print(report.render_text(ozet, f"GÜN RAPORU — {gun.strftime('%d.%m.%Y')}"))
 
-    vardiyalar = report.shift_bounds(app.cfg, gun)
-    if len(vardiyalar) > 1:
+    # Flat chronological list -- what people actually read.
+    olaylar = app.storage.events_between(ts_from, ts_to)
+    if olaylar:
         print("-" * 68)
-        print("  VARDİYALAR")
+        print("  TÜM KAYITLAR")
         print("-" * 68)
-        print(f"  {'Vardiya':<16}{'Çalışma':>12}{'Duruş':>12}{'Kullanım':>12}")
-        for etiket, baslangic, bitis in vardiyalar:
-            v = report.summarize(app.storage, app.cfg, baslangic, bitis)
-            kullanim = f"%{v['availability']:.1f}" if v["availability"] else "—"
+        print(f"  {'Saat':<10}{'Bitiş':<10}{'Durum':<14}{'Süre':>11}  Açıklama")
+        for row in olaylar:
+            baslangic = datetime.fromtimestamp(row["ts_start"]).strftime("%H:%M:%S")
+            bitis = (
+                datetime.fromtimestamp(row["ts_end"]).strftime("%H:%M:%S")
+                if row.get("ts_end") else "—"
+            )
+            durum = row.get("state") or row["type"].upper()
+            if row.get("state"):
+                durum = STATE_LABELS[MachineState(row["state"])]
+            aciklama = row.get("text") or row.get("program_name") or ""
+            if row.get("code"):
+                aciklama = f"[{row['code']}] {aciklama}"
             print(
-                f"  {etiket:<16}"
-                f"{report.format_duration(v['run_s']):>12}"
-                f"{report.format_duration(v['down_s']):>12}"
-                f"{kullanim:>12}"
+                f"  {baslangic:<10}{bitis:<10}{durum:<14}"
+                f"{report.format_duration(row.get('duration_s')):>11}  {aciklama}"
             )
         print()
 
@@ -350,6 +361,102 @@ def _test_baglanti(args) -> int:
     return 0
 
 
+def _izle(args) -> int:
+    """Show what the control reports, live, without recording anything.
+
+    Built for one question: when the operator switches between Manual, Test
+    Run and Program Run, what do execution_state and program_status actually
+    return? Guessing that mapping from documentation is how you get a logger
+    that quietly says KURULUM all shift.
+    """
+    try:
+        app = build_application(
+            config_path=args.config,
+            base_dir=args.dizin,
+            driver_name=args.surucu,
+            sim_speed=args.sim_hiz,
+            sim_seed=args.sim_seed,
+            writer=False,
+        )
+    except (AlreadyRunning, DriverError) as exc:
+        print(f"HATA: {exc}", file=sys.stderr)
+        return 1
+
+    if hasattr(app.driver, "progress_callback"):
+        app.driver.progress_callback = lambda m: print(f"  {m}")
+
+    print("Tezgaha bağlanılıyor…")
+    try:
+        app.driver.connect()
+    except (DriverError, OSError) as exc:
+        print(f"BAĞLANTI KURULAMADI: {exc}", file=sys.stderr)
+        app.close_readonly()
+        return 1
+
+    print(f"Bağlandı: {app.driver.describe()}\n")
+    print("Tezgahta modları değiştirin (Manual / Test Run / Program Run) ve")
+    print("program başlatıp durdurun. Aşağıdaki satırlar canlı güncellenir.")
+    print("Durdurmak için Ctrl+C. Bu komut HİÇBİR ŞEY KAYDETMEZ.\n")
+    print(f"{'saat':<9}{'ham mod':<14}{'ham pgm':<14}{'->durum':<13}"
+          f"{'F':>7}{'S':>8}  {'prog':<14}{'N':>6}{'T':>4}")
+    print("-" * 92)
+
+    tracker = app.collector.tracker
+    inner = getattr(app.driver, "_inner", app.driver)
+    onceki = None
+    sayac = 0
+
+    try:
+        while True:
+            try:
+                snap = app.driver.read()
+            except DriverError as exc:
+                print(f"{datetime.now():%H:%M:%S}  OKUMA HATASI: {exc}")
+                time.sleep(2.0)
+                continue
+
+            # Reach past our own mapping to the values pyLSV2 handed us, so a
+            # wrong mapping on our side is visible rather than hidden.
+            ham_mod = ham_pgm = "?"
+            client = getattr(inner, "_client", None)
+            if client is not None:
+                try:
+                    ham_mod = getattr(client.execution_state(), "name", "?")
+                except Exception:  # noqa: BLE001
+                    ham_mod = "okunamadı"
+                try:
+                    ham_pgm = getattr(client.program_status(), "name", "?")
+                except Exception:  # noqa: BLE001
+                    ham_pgm = "okunamadı"
+
+            durum = tracker.derive_state(snap)
+            satir = (
+                f"{datetime.now():%H:%M:%S}  "
+                f"{ham_mod:<14}{ham_pgm:<14}{STATE_LABELS[durum]:<13}"
+                f"{format_number(snap.feed_actual):>7}"
+                f"{format_number(snap.spindle_actual):>8}  "
+                f"{(snap.program_name or '—')[:13]:<14}"
+                f"{format_number(snap.block_number):>6}"
+                f"{format_number(snap.tool_number):>4}"
+            )
+            # Only print when something changed, plus a heartbeat every 15 s,
+            # so the interesting moments are not buried in repetition.
+            imza = (ham_mod, ham_pgm, durum, snap.program_name,
+                    snap.block_number)
+            sayac += 1
+            if imza != onceki or sayac % 15 == 0:
+                print(satir + ("   <-- DEĞİŞTİ" if imza != onceki and onceki
+                               else ""))
+                onceki = imza
+            time.sleep(1.0)
+    except KeyboardInterrupt:
+        print("\n\nİzleme durduruldu.")
+    finally:
+        app.driver.disconnect()
+        app.close_readonly()
+    return 0
+
+
 def _surucu_detaylari(app) -> None:
     """Driver-specific diagnostics, printed after the generic snapshot."""
     driver = app.driver
@@ -511,6 +618,8 @@ def main(argv: Optional[list] = None) -> int:
         return _rapor_calistir(args, args.rapor)
     if args.tara:
         return _tara(args)
+    if args.izle:
+        return _izle(args)
     if args.test_baglanti:
         return _test_baglanti(args)
     return _normal_calistir(args)

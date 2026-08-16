@@ -6,41 +6,55 @@ duruşları ve alarmları tutan, gün/vardiya raporu çıkaran bir program.
 > **Günlük kullanım için → [KULLANIM.md](KULLANIM.md)**
 > Bu dosya kurulum içindir; operatörün okuması gereken belge diğeridir.
 
-**Özet:** USB'yi tak, klasörü kopyala, `sh baslat.sh` yaz. Kurulum yok, paket
+**Özet:** USB'yi tak, klasörü ev dizinine kopyala, `bash baslat.sh` yaz. Kurulum yok, paket
 indirme yok, internet gerekmez. Program tezgahı ağda kendisi bulur.
 
 | Nerede çalıştıracaksınız | Ne yazacaksınız |
 |---|---|
-| **Tezgah (HEROS)** | **`python baslat.py`** ← bunu kullanın |
-| Tezgah — alternatif | `bash baslat.sh` |
-| Linux / macOS | `python3 baslat.py` |
+| **Tezgah (HEROS)** | **`bash baslat.sh`** ← bunu kullanın |
+| Linux / macOS | `python3 baslat.py` veya `bash baslat.sh` |
 | Windows — CMD / PowerShell | `baslat.bat` |
 | Windows — Git Bash | `sh baslat.sh` |
 
-> **HEROS'ta `sh baslat.sh` neden çalışmıyor?**
-> `sh: no permission to execute baslat.sh` hatası alırsınız. HEROS'un `sh`
-> komutu kısıtlı bir kabuktur (BusyBox ash) ve betiği çalıştırmayı reddeder;
-> `chmod +x` ve `sudo` bunu çözmez.
+> **HEROS'ta neden `bash`?** Bu sistemde denenmiş sonuçlar:
 >
-> **İki çözüm de işe yarar:**
-> - `python baslat.py` — önerilen. Çalıştırılan şey `python`, dosya yalnızca
->   okunur; çalıştırma izni hiç devreye girmez.
-> - `bash baslat.sh` — HEROS'ta gerçek `bash` kurulu ve bu şekilde çalışır.
+> | Komut | Sonuç |
+> |---|---|
+> | `sh baslat.sh` | ❌ `no permission to execute` — `sh` kısıtlı bir kabuk (BusyBox ash) |
+> | `python baslat.py` | ❌ SELinux engelliyor (`avc: denied { execute }`) |
+> | **`bash baslat.sh`** | ✅ **çalışıyor** |
 >
-> **Bir şey ters giderse:** `python baslat.py --teshis`
+> `chmod +x`, `sudo` ve klasörü ev dizinine kopyalamak ilk ikisini çözmedi;
+> SELinux politikası dosyanın bağlamına (`base_t`) bakıyor. `bash` bu
+> kısıttan etkilenmiyor, o yüzden kısayollar da `bash` üzerinden tanımlanır.
+>
+> **Bir şey ters giderse:** `bash baslat.sh --teshis`
 
 ### Çift tıklayarak başlatmak
 
 Bir kez şunu çalıştırın:
 
 ```bash
-python baslat.py --kisayol
+bash baslat.sh --kisayol
 ```
 
 Masaüstüne ve XFCE menüsüne **CNC Log** kısayolu koyar. Bundan sonra
 operatörün terminal açmasına gerek kalmaz — simgeye çift tıklaması yeterlidir.
-Kısayol `python baslat.py` çağırdığı için çalıştırma izni sorunu burada da
-ortaya çıkmaz.
+
+### Bilgisayar açılınca kendiliğinden başlaması
+
+```bash
+bash baslat.sh --otomatik-baslat
+```
+
+Her açılışta kayıt sessizce arka planda başlar (terminal penceresi açılmaz,
+tarayıcı da açılmaz). Arayüze bakmak isteyen `127.0.0.1:8760` adresini açar.
+
+Kapatmak için: `rm ~/.config/autostart/cnclog.desktop`
+
+> Kısayollar `bash baslat.sh` çağırır. HEROS'ta SELinux `python baslat.py`
+> çalıştırmayı engelleyebiliyor (aşağıya bakın) ama `bash` her durumda
+> çalışıyor.
 
 **Windows'ta simülatörle denemek için → [3B bölümü](#3b-windowsta-tnc-640-programming-station-ile-deneme)**
 
@@ -135,26 +149,26 @@ CNC log System/
 4. Klasöre gir ve çalıştır:
 
 ```bash
-cd ~/Desktop/cnclog
-python baslat.py
+cd ~/cnclog
+bash baslat.sh
 ```
 
-**`sh baslat.sh` değil, `python baslat.py`.** HEROS'ta shell betikleri
-"no permission to execute" hatası verebiliyor; `chmod +x` ve `sudo` bunu
-çözmüyor. `python baslat.py` bu sorunu tamamen atlar.
+**`sh` değil `bash` yazın.** HEROS'un `sh` komutu kısıtlı bir kabuktur ve
+betiği çalıştırmayı reddeder; `python baslat.py` ise SELinux tarafından
+engelleniyor. `bash` bu sistemde sorunsuz çalışıyor.
 
 Bir sorun çıkarsa önce şunu çalıştırın — hiçbir şeyi değiştirmez, sadece
 ortamı inceler ve nerenin yazılabilir/çalıştırılabilir olduğunu söyler:
 
 ```bash
-python baslat.py --teshis
+bash baslat.sh --teshis
 ```
 
 İlk çalıştırmada şunu görürsünüz:
 
 ```
-Python 3 hazirlaniyor (linux-musl -> /home/user/Desktop/cnclog/...)...
-Hazir: /home/user/Desktop/cnclog/cnclog/vendor/python/rt/python/bin/python3
+Python 3 hazirlaniyor (linux-musl)... ilk calistirmada bir defa yapilir.
+Hazir: /home/user/cnclog/cnclog/vendor/python/rt/python/bin/python3
 ==============================================================
  CNC Log System 1.0.0 — Heidenhain TNC 640 (TEZGAH-01)
 ==============================================================
@@ -190,13 +204,13 @@ aramaya devam eder — **asla sahte veri üretmez**.
 Aramayı ayrıca çalıştırıp sonucu görmek için:
 
 ```bash
-sh baslat.sh --tara
+bash baslat.sh --tara
 ```
 
 Bağlantıyı test etmek, hangi verilerin okunabildiğini görmek için:
 
 ```bash
-sh baslat.sh --test-baglanti
+bash baslat.sh --test-baglanti
 ```
 
 Bu komut tezgaha **hiçbir şey yazmaz**, tek bir okuma yapar ve çıkar. Çıktının
@@ -319,8 +333,33 @@ baslat.bat --test-baglanti
 baslat.bat
 ```
 
-Simülatörde bir program çalıştırın; arayüzde durumun ÇALIŞIYOR'a döndüğünü,
-durdurduğunuzda DURUŞ kaydı açıldığını görmelisiniz.
+### Durum ÇALIŞIYOR'a dönmüyorsa
+
+> **En sık sebep: yanlış çalışma modu.** Kontrolde **Test Run** (program testi)
+> modu programı gerçekten çalıştırmaz — sadece grafik simülasyonu yapar,
+> eksenler hareket etmez ve kontrol bunu "çalışıyor" saymaz. Durum
+> `KURULUM` olarak kalır ve bu **doğru** davranıştır.
+>
+> Gerçek kayıt için **Program Run** (Program Run, Full Sequence) modunu
+> kullanın — tezgahta parça üretilirken kullanılan mod budur.
+
+Kontrolün ne bildirdiğini kendi gözünüzle görmek için:
+
+```
+baslat.bat --izle
+```
+
+Bu komut hiçbir şey kaydetmez; her saniye kontrolden gelen **ham** değerleri
+basar. Modları değiştirdikçe satırların nasıl değiştiğini görürsünüz:
+
+```
+saat      ham mod       ham pgm       ->durum         F      S   prog        N   T
+03:21:42  MANUAL        UNDEFINED     KURULUM         —      —   —           —   5
+03:24:10  AUTOMATIC     STARTED       ÇALIŞIYOR       —      —   TEST.H     42   5
+```
+
+Durum beklediğiniz gibi değilse bu çıktıyı gönderin — `ham mod` ve `ham pgm`
+sütunları sorunun nerede olduğunu kesin söyler.
 
 ### Bulamazsa
 
@@ -440,23 +479,24 @@ kayıtları çok küçüktür ve **hiç silinmez**.
 
 | Belirti | Çözüm |
 |---|---|
-| `sh: no permission to execute baslat.sh` | `python baslat.py` veya `bash baslat.sh` kullanın. HEROS'un `sh`'ı kısıtlı; `chmod +x` ve `sudo` çözmez. |
-| `SELinux blocked program execution` | Klasör paylaşılan/USB üzerinde. **Ev dizinine kopyalayın:** `cp -r /mnt/sf/Install/cnclog ~/cnclog` |
-| Windows: `Python was not found` | `python baslat.py` yerine **`baslat.bat`** kullanın. Windows'ta sistem Python'u yok; `baslat.bat` gömülü olanı bulur. |
+| `sh: no permission to execute baslat.sh` | **`bash baslat.sh`** kullanın. HEROS'un `sh`'ı kısıtlı bir kabuk; `chmod +x` ve `sudo` çözmez. |
+| `SELinux blocked program execution` | `python baslat.py` yerine **`bash baslat.sh`** kullanın. (Ev dizinine kopyalamak bu engeli kaldırmıyor; SELinux dosya bağlamına bakıyor.) |
+| Windows: `Python was not found` | **`baslat.bat`** kullanın. Windows'ta sistem Python'u yok; `baslat.bat` gömülü olanı bulur. |
 | Arayüz ağır/kasıyor | `config.ini` → `[web] yenileme_sn = 4`. Ayrıca `tarayici_ac = hayir` yapıp tarayıcıyı bir kez elle açın. |
 | Her başlatmada yeni sekme açılıyor | `config.ini` → `[web] tarayici_ac = hayir`. Tarayıcıyı bir kez açıp `127.0.0.1:8760` sayfasını açık bırakın. |
 | `python: can't open file 'baslat.py'` | Dosya klasörde yok — eski bir kopya kullanıyorsunuz. Paketi yeniden kopyalayın. |
+| Durum hep KURULUM, hiç ÇALIŞIYOR olmuyor | **Test Run** modundasınız — o mod programı gerçekten çalıştırmaz. **Program Run** moduna geçin. Emin olmak için `bash baslat.sh --izle` |
 | Tarayıcı açıldı ama boş sayfa | Adres satırına `127.0.0.1:8760` yazın. Program çalışıyor, tarayıcı adrese gitmemiş. |
 | `Calisir bir Python 3 bulunamadi` | `python baslat.py --teshis` çalıştırıp çıktıyı gönderin. |
 | `Python'u acacak yazilabilir bir klasor bulunamadi` | Program klasörü salt-okunur (USB). Ev dizinine kopyalayın; `baslat.py` ayrıca `/tmp`'yi de dener. |
 | `TEZGAH BULUNDU ama erişime izin vermedi` | Dış erişim kapalı. PROGRAMLAMA modu → MOD → External access = ON → END. Adres aramanıza gerek yok. |
 | Permission denied | `./baslat.sh` yerine `python baslat.py` yazın. |
 | `Program zaten çalışıyor (PID …)` | İkinci kopya açılmaya çalışıldı. Bu koruma kasıtlıdır: iki kopya aynı veriye yazarsa süreler bozulur. |
-| Tezgah bulunamıyor | `sh baslat.sh --tara`. Tezgah açık mı, LSV2/DNC erişimi açık mı kontrol edin. |
+| Tezgah bulunamıyor | `bash baslat.sh --tara`. Tezgah açık mı, LSV2/DNC erişimi açık mı kontrol edin. |
 | Bağlanıyor ama veri yok | DNC opsiyonu (18) lisanslı değil veya LSV2 kapalı. Servisten açtırın. |
 | F ve S sürekli `—` | Normal. Bkz. 4. bölüm. |
 | Tarayıcı açılmıyor | Sunucu yine çalışıyor. QupZilla'yı elle açıp `127.0.0.1:8760` yazın. |
-| Port kullanımda | `sh baslat.sh --port 8761` |
+| Port kullanımda | `bash baslat.sh --port 8761` |
 | `Önceki oturum düzgün kapanmamış` | Bilgi mesajı, hata değil. Açık kayıtlar onarıldı, veri kaybı yok. |
 
 Programı durdurmak: terminalde **Ctrl+C**. Açık kayıtlar düzgün kapatılır.
@@ -486,22 +526,24 @@ sh kurulum/kesif.sh 192.168.1.50
 Tezgahta (HEROS) ve genel olarak en güvenli yol:
 
 ```bash
-python baslat.py                   # normal çalıştır
-python baslat.py --kisayol         # masaüstüne çift tıklanır kısayol koy
-python baslat.py --teshis          # ortamı incele (sorun varsa ilk bu)
-python baslat.py --tara            # tezgahı ağda ara
-python baslat.py --test-baglanti   # bağlan, veri oku, çık
-python baslat.py --rapor bugun     # günün raporunu ekrana bas
-python baslat.py --web-yok         # arayüzsüz, sadece kayıt
-python baslat.py --port 8761       # başka port
-python baslat.py --surucu simulator  # sahte tezgahla dene (sadece deneme!)
-python baslat.py --help            # tüm seçenekler
+bash baslat.sh                     # normal çalıştır
+bash baslat.sh --kisayol           # masaüstüne çift tıklanır kısayol
+bash baslat.sh --otomatik-baslat   # açılışta kendiliğinden başlasın
+bash baslat.sh --izle              # kontrolden geleni canlı izle (teşhis)
+bash baslat.sh --teshis            # ortamı incele (sorun varsa ilk bu)
+bash baslat.sh --tara              # tezgahı ağda ara
+bash baslat.sh --test-baglanti     # bağlan, veri oku, çık
+bash baslat.sh --rapor bugun       # günün raporunu ekrana bas
+bash baslat.sh --web-yok           # arayüzsüz, sadece kayıt
+bash baslat.sh --port 8761         # başka port
+bash baslat.sh --help              # tüm seçenekler
 ```
 
 Windows'ta (CMD / PowerShell) aynı komutlar `baslat.bat` ile:
 
 ```
 baslat.bat --tara
+baslat.bat --izle
 baslat.bat --test-baglanti
 baslat.bat
 ```
